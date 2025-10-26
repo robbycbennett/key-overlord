@@ -57,7 +57,7 @@ int main()
 		for (const char *file = dir.read(); file && running; file = dir.read()) {
 			if (!is_physical_device(file))
 				continue;
-			physicals_keyboards[keyboard_i] = PhysicalKeyboard(file);
+			physicals_keyboards[keyboard_i].open(file);
 			if (keyboard_i >= MAX_KEYBOARDS)
 				break;
 			keyboard_i++;

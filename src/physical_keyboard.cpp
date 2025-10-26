@@ -6,21 +6,33 @@
 #include "physical_keyboard.hpp"
 
 
-PhysicalKeyboard::PhysicalKeyboard(const char *path):
-	m_file(open(path, O_RDWR))
-{}
-
-
 PhysicalKeyboard::~PhysicalKeyboard()
 {
-	if (m_file != -1)
-		close(m_file);
+	close();
+}
+
+
+bool PhysicalKeyboard::close()
+{
+	if (m_file == -1)
+		return false;
+	int result = ::close(m_file);
+	m_file = -1;
+	return result == 0;
 }
 
 
 bool PhysicalKeyboard::grab()
 {
 	return ioctl(m_file, EVIOCGRAB, 1) != -1;
+}
+
+
+bool PhysicalKeyboard::open(const char *path)
+{
+	close();
+	m_file = ::open(path, O_RDWR);
+	return m_file != -1;
 }
 
 
