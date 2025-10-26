@@ -15,7 +15,8 @@ PhysicalKeyboard::~PhysicalKeyboard()
 bool PhysicalKeyboard::close()
 {
 	if (m_file == -1)
-		return false;
+		return true;
+	ungrab();
 	int result = ::close(m_file);
 	m_file = -1;
 	return result == 0;

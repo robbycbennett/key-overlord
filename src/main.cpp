@@ -45,19 +45,27 @@ int main()
 	signal(SIGTERM, handle_signal);
 
 	// Acquire keyboards
-	PhysicalKeyboard physicals_keyboards[MAX_KEYBOARDS];
+	PhysicalKeyboard physicals[MAX_KEYBOARDS];
 	uint8_t keyboard_i = 0;
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
-		if (!dir) {
+		if (not dir) {
 			PRINT_ERROR("Failed to open " PHYSICAL_DEVICE_DIRECTORY)
 			return 1;
 		}
 
 		for (const char *file = dir.read(); file && running; file = dir.read()) {
-			if (!is_physical_device(file))
+			if (not is_physical_device(file))
 				continue;
-			physicals_keyboards[keyboard_i].open(file);
+			PhysicalKeyboard &physical = physicals[keyboard_i];
+			if (not physical.open(file)) {
+				PRINT_ERROR("Failed to open a physical keyboard device")
+				return 1;
+			}
+			if (not physical.grab()) {
+				PRINT_ERROR("Failed to grab a physical keyboard device")
+				return 1;
+			}
 			if (keyboard_i >= MAX_KEYBOARDS)
 				break;
 			keyboard_i++;

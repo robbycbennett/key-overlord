@@ -18,7 +18,7 @@ Dir::~Dir()
 
 const char *Dir::read()
 {
-	if (!m_dir)
+	if (not m_dir)
 		return nullptr;
 	dirent *file = readdir(static_cast<DIR *>(m_dir));
 	return file ? file->d_name : nullptr;
