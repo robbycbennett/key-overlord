@@ -15,6 +15,10 @@ public:
 	bool get(uint16_t key);
 	void set(uint16_t key);
 
+	bool operator==(const KeyboardState &other) const;
+
 private:
-	uint8_t m_data[KEY_COUNT / 8] = {0};
+	static constexpr uint8_t KEY_GROUP_COUNT = KEY_COUNT / 8;
+
+	uint8_t m_data[KEY_GROUP_COUNT] = {0};
 };
