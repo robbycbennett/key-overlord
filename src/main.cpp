@@ -6,8 +6,10 @@
 #include "config.hpp"
 #include "dir.hpp"
 #include "error.hpp"
-#include "physical_keyboard.hpp"
+#include "keyboard.hpp"
 
+
+#define PHYSICAL_DEVICE_DIRECTORY "/dev/input/by-path/"
 
 static bool running = true;
 
@@ -44,9 +46,15 @@ int main()
 	signal(SIGABRT, handle_signal);
 	signal(SIGTERM, handle_signal);
 
-	// Acquire keyboards
-	PhysicalKeyboard physicals[MAX_KEYBOARDS];
-	uint8_t keyboard_i = 0;
+	// Acquire the virtual keyboard
+	Keyboard virtual_keyboard;
+	if (not virtual_keyboard.open_virtual()) {
+		PRINT_ERROR("Failed to create a virtual keyboard")
+		return 1;
+	}
+
+	// Acquire physical keyboards
+	Keyboard physical_keyboards[MAX_KEYBOARDS];
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
 		if (not dir) {
@@ -54,11 +62,12 @@ int main()
 			return 1;
 		}
 
+		uint8_t i = 0;
 		for (const char *file = dir.read(); file && running; file = dir.read()) {
 			if (not is_physical_device(file))
 				continue;
-			PhysicalKeyboard &physical = physicals[keyboard_i];
-			if (not physical.open(file)) {
+			Keyboard &physical = physical_keyboards[i];
+			if (not physical.open_physical(file)) {
 				PRINT_ERROR("Failed to open a physical keyboard device")
 				return 1;
 			}
@@ -66,9 +75,9 @@ int main()
 				PRINT_ERROR("Failed to grab a physical keyboard device")
 				return 1;
 			}
-			if (keyboard_i >= MAX_KEYBOARDS)
+			if (i >= MAX_KEYBOARDS)
 				break;
-			keyboard_i++;
+			i++;
 		}
 	}
 }
