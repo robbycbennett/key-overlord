@@ -75,9 +75,9 @@ int main()
 				PRINT_ERROR("Failed to grab a physical keyboard device")
 				return 1;
 			}
+			i++;
 			if (i >= MAX_KEYBOARDS)
 				break;
-			i++;
 		}
 	}
 }
