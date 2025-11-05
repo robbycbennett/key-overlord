@@ -11,12 +11,12 @@ OBJECT_TYPE := .o
 STANDARD := -std=c++20
 OPTIMIZE := -O1
 
-IGNORED := -Wno-c++98-compat-pedantic
+IGNORED := -Wno-c++98-compat-pedantic -Wno-unsafe-buffer-usage
 
 ifeq ($(COMPILER), clang++)
 	WARNINGS := -Weverything $(IGNORED)
 else
-	WARNINGS := -Wall
+	WARNINGS := -Wall $(IGNORED)
 endif
 
 COMPILE_FLAGS := $(STANDARD) $(OPTIMIZE) $(WARNINGS)
@@ -25,7 +25,7 @@ LINK_FLAGS := -fuse-ld=lld
 DEBUG := 1
 ifneq ($(DEBUG), 0)
 	LINK_FLAGS := $(LINK_FLAGS) -g
-	COMPILE_FLAGS := -DDEBUG
+	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
 endif
 
 SOURCE_FOLDER := src

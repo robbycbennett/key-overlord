@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "dir.hpp"
 #include "error.hpp"
+#include "events.hpp"
 #include "keyboard.hpp"
 #include "keyboard_state.hpp"
 
@@ -76,16 +77,5 @@ int main()
 			if (i >= MAX_KEYBOARDS)
 				break;
 		}
-	}
-
-	// Initialize the event array
-	// TODO do it at compile time mwhahahaha
-	static constexpr uint16_t EVENT_COUNT = KEY_COUNT * 2;
-	input_event events[EVENT_COUNT];
-	for (size_t i = 0; i < EVENT_COUNT - 1; i += 2) {
-		events[i].type      = EV_KEY;
-		events[i + 1].type  = EV_SYN;
-		events[i + 1].code  = SYN_REPORT;
-		events[i + 1].value = 0;
 	}
 }
