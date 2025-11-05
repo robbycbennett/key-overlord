@@ -1,31 +1,26 @@
 #include "keyboard_state.hpp"
 
 
-#ifdef DEBUG
-	#include <assert.h>
-	#define DEBUG_INDEX assert(key < KEY_COUNT);
-#else
-	#define DEBUG_INDEX
-#endif
-
-
 void KeyboardState::clear(uint16_t key)
 {
-	DEBUG_INDEX
+	if (key > KEY_COUNT)
+		return;
 	m_data[key / 8] &= ~(1 << (key % 8));
 }
 
 
 bool KeyboardState::get(uint16_t key)
 {
-	DEBUG_INDEX
+	if (key > KEY_COUNT)
+		return false;
 	return m_data[key / 8] & (1 << (key % 8));
 }
 
 
 void KeyboardState::set(uint16_t key)
 {
-	DEBUG_INDEX
+	if (key > KEY_COUNT)
+		return;
 	m_data[key / 8] |= 1 << (key % 8);
 }
 
