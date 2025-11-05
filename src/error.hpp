@@ -4,8 +4,8 @@
 #include <stdio.h>
 
 
-#define PRINT_ERROR_INNER(message) "keyoverlord: " message "\n"
+#define FAIL_INNER(message) "keyoverlord: " message "\n"
 
 
-// Print a message static string to stderr with a new line
-#define PRINT_ERROR(message) fwrite(PRINT_ERROR_INNER(message), 1, sizeof(PRINT_ERROR_INNER(message)) - 1, stderr);
+// Print a message static string to stderr with a new line and return 1
+#define FAIL(message) return fwrite(FAIL_INNER(message), 1, sizeof(FAIL_INNER(message)) - 1, stderr), 1;

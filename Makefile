@@ -77,7 +77,8 @@ help:
 	@$(ECHO_NEW_LINE)
 
 run: $(PROGRAM)
-	@$(ECHO_NEW_LINE)
-	@echo $(PROGRAM)
-	@$(ECHO_NEW_LINE)
-	@$(PROGRAM)
+# 	@$(ECHO_NEW_LINE)
+# 	@echo $(PROGRAM)
+# 	@$(ECHO_NEW_LINE)
+# 	@$(PROGRAM)
+	rsync $(PROGRAM) laptop:
