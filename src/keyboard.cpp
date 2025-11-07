@@ -26,6 +26,12 @@ bool Keyboard::close()
 }
 
 
+int Keyboard::file()
+{
+	return m_file;
+}
+
+
 bool Keyboard::grab()
 {
 	return ioctl(m_file, EVIOCGRAB, 1) != -1;
@@ -81,4 +87,10 @@ bool Keyboard::ungrab()
 bool Keyboard::write(const input_event &events, size_t event_count)
 {
 	return ::write(m_file, &events, sizeof(input_event) * event_count) != -1;
+}
+
+
+Keyboard::operator bool() const
+{
+	return m_file != -1;
 }

@@ -1,9 +1,9 @@
 #include <linux/input.h>
 
-#include "events.hpp"
+#include "output_events.hpp"
 
 
-input_event events[EVENT_COUNT] = {
+input_event output_events[EVENT_COUNT] = {
 	{
 		.time = {0, 0},
 		.type = EV_KEY,

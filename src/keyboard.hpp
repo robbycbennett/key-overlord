@@ -14,6 +14,9 @@ public:
 	// Close the file
 	bool close();
 
+	// Get the file
+	int file();
+
 	// Get exclusive access
 	bool grab();
 
