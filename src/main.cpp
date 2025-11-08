@@ -1,5 +1,5 @@
-#include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <linux/input.h>
@@ -10,8 +10,6 @@
 #include "dir.hpp"
 #include "error.hpp"
 #include "keyboard.hpp"
-#include "keyboard_state.hpp"
-#include "output_events.hpp"
 
 
 #define PHYSICAL_DEVICE_DIRECTORY "/dev/input/by-path/"
@@ -52,6 +50,18 @@ int main()
 	Keyboard virtual_keyboard;
 	if (not virtual_keyboard.open_virtual())
 		FAIL("Failed to create a virtual keyboard")
+
+	// // TODO fix the virtual keyboard
+	// uinput_setup usetup;
+	// ioctl(fd, UI_SET_EVBIT, EV_KEY);
+	// ioctl(fd, UI_SET_KEYBIT, KEY_SPACE);
+	// memset(&usetup, 0, sizeof(usetup));
+	// usetup.id.bustype = BUS_USB;
+	// usetup.id.vendor = 0x1234; /* sample vendor */
+	// usetup.id.product = 0x5678; /* sample product */
+	// strcpy(usetup.name, "Example device");
+	// ioctl(fd, UI_DEV_SETUP, &usetup);
+	// ioctl(fd, UI_DEV_CREATE);
 
 	// Prepare to listen to keyboard events
 	int epoll_file = epoll_create1(0);
@@ -122,8 +132,17 @@ int main()
 			epoll_event &event = epoll_events[i];
 			int file = event.data.fd;
 			ssize_t bytes = read(file, input_events, INPUT_EVENT_COUNT * sizeof(input_event));
-			printf("%zd bytes read\n", bytes);
+			if (bytes != INPUT_EVENT_COUNT * sizeof(input_event)) {
+				printf("warning: %zd bytes read\n", bytes); // DEBUG
+				continue;
+			}
+			// for (uint8_t j = 0; j < INPUT_EVENT_COUNT; j++) {
+			// 	input_event &event = input_events[j];
+			// 	printf("%d %d %d\n", event.type, event.code, event.value);
+			// }
 			// TODO write
+			bytes = write(virtual_keyboard.file(), input_events, INPUT_EVENT_COUNT * sizeof(input_event));
+			printf("debug: %zd bytes written\n", bytes); // DEBUG
 		}
 	}
 
