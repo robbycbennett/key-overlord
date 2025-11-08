@@ -1,6 +1,6 @@
 # Variables
 
-PROGRAM := keyoverlord
+PROGRAM_NAME := keyoverlord
 
 COMPILER := clang++
 
@@ -39,7 +39,7 @@ CLEAN_COMMAND := rm -rf $(CLEAN_FOLDERS)
 SOURCES := $(wildcard $(SOURCE_FOLDER)/*$(SOURCE_TYPE))
 HEADERS := $(wildcard $(SOURCE_FOLDER)/*$(HEADER_TYPE))
 OBJECTS := $(patsubst $(SOURCE_FOLDER)/%$(SOURCE_TYPE),$(OUTPUT_FOLDER)/%$(OBJECT_TYPE),$(SOURCES))
-PROGRAM := $(OUTPUT_FOLDER)/$(PROGRAM)
+PROGRAM := $(OUTPUT_FOLDER)/$(PROGRAM_NAME)
 
 
 # Targets
@@ -81,4 +81,8 @@ run: $(PROGRAM)
 # 	@echo $(PROGRAM)
 # 	@$(ECHO_NEW_LINE)
 # 	@$(PROGRAM)
-	rsync $(PROGRAM) laptop:
+	rsync $(PROGRAM) root@laptop:
+	ssh root@laptop -t ./$(PROGRAM_NAME)
+
+kill:
+	ssh root@laptop pkill -9 -f $(PROGRAM_NAME)

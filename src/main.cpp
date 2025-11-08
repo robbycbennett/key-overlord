@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <signal.h>
 #include <string.h>
 
@@ -57,9 +58,20 @@ int main()
 	if (epoll_file == -1)
 		FAIL("Failed to create an event poll file")
 
+	// Configure what keyboard events to listen to
+	epoll_event epoll_events[MAX_KEYBOARDS] = {
+		epoll_event {
+			.events = EPOLLIN,
+			.data = epoll_data { .ptr = nullptr },
+		},
+		epoll_event {
+			.events = EPOLLIN,
+			.data = epoll_data { .ptr = nullptr },
+		},
+	};
+
 	// Acquire physical keyboards and listen to them
 	Keyboard physical_keyboards[MAX_KEYBOARDS];
-	epoll_event epoll_events[MAX_KEYBOARDS];
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
 		if (not dir)
@@ -69,17 +81,24 @@ int main()
 
 		uint8_t i = 0;
 		for (const char *name = dir.read(); name && running; name = dir.read()) {
+			// Skip everything but physical keyboards
 			size_t name_length = strlen(name);
-			if (sizeof(PHYSICAL_DEVICE_DIRECTORY) + name_length > sizeof(path))
-				FAIL("Path of physical keyboard device is too large")
 			if (not is_physical_device(name, name_length))
 				continue;
-			Keyboard &physical = physical_keyboards[i];
+
+			// Get the path to the keyboard
+			if (sizeof(PHYSICAL_DEVICE_DIRECTORY) + name_length > sizeof(path))
+				FAIL("Path of physical keyboard device is too large")
 			memcpy(path + sizeof(PHYSICAL_DEVICE_DIRECTORY) - 1, name, name_length);
+
+			// Acquire and grab the keyboard
+			Keyboard &physical = physical_keyboards[i];
 			if (not physical.open_physical(path))
 				FAIL("Failed to open a physical keyboard device")
 			if (not physical.grab())
 				FAIL("Failed to grab a physical keyboard device")
+			// Watch the keyboard and remember the file descriptor
+			epoll_events[i].data.fd = physical.file();
 			if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, physical.file(), epoll_events + i) == -1)
 				FAIL("Failed to watch a physical keyboard device")
 			i++;
@@ -94,16 +113,16 @@ int main()
 	static constexpr uint8_t INPUT_EVENT_COUNT = 3;
 	input_event input_events[INPUT_EVENT_COUNT];
 
-	while (true) {
+	while (running) {
 		int event_count = epoll_wait(epoll_file, epoll_events, MAX_KEYBOARDS, -1);
 		if (event_count < 0)
-			FAIL("Failed to wait for keyboard events")
-		printf("%d\n", event_count); // DEBUG
+			continue;
+
 		for (int i = 0; i < event_count; i++) {
-			int file = epoll_events[i].data.fd;
-			printf("keyboard %d had %u events", file, epoll_events[i].events);
-			// TODO read all events of the keyboard in 1 system call
-			// ssize_t bytes = read(file, input_events, INPUT_EVENT_COUNT * sizeof(input_event));
+			epoll_event &event = epoll_events[i];
+			int file = event.data.fd;
+			ssize_t bytes = read(file, input_events, INPUT_EVENT_COUNT * sizeof(input_event));
+			printf("%zd bytes read\n", bytes);
 			// TODO write
 		}
 	}
