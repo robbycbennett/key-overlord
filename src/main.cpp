@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <linux/input.h>
+#include <linux/uinput.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 
@@ -46,22 +47,13 @@ int main()
 	signal(SIGABRT, handle_signal);
 	signal(SIGTERM, handle_signal);
 
+	// TODO separate the keyboard into 2 classes
+
 	// Acquire the virtual keyboard
 	Keyboard virtual_keyboard;
 	if (not virtual_keyboard.open_virtual())
 		FAIL("Failed to create a virtual keyboard")
-
-	// // TODO fix the virtual keyboard
-	// uinput_setup usetup;
-	// ioctl(fd, UI_SET_EVBIT, EV_KEY);
-	// ioctl(fd, UI_SET_KEYBIT, KEY_SPACE);
-	// memset(&usetup, 0, sizeof(usetup));
-	// usetup.id.bustype = BUS_USB;
-	// usetup.id.vendor = 0x1234; /* sample vendor */
-	// usetup.id.product = 0x5678; /* sample product */
-	// strcpy(usetup.name, "Example device");
-	// ioctl(fd, UI_DEV_SETUP, &usetup);
-	// ioctl(fd, UI_DEV_CREATE);
+	int virtual_keyboard_file = virtual_keyboard.file();
 
 	// Prepare to listen to keyboard events
 	int epoll_file = epoll_create1(0);
@@ -117,7 +109,8 @@ int main()
 		}
 	}
 
-	// TODO release all keys before grab
+	// TODO wait until the device node is available (libevdev fetch_syspath_and_devnode) and release all keys before grab
+
 	// TODO watch for keyboard plug/unplug events
 
 	static constexpr uint8_t INPUT_EVENT_COUNT = 3;
@@ -140,9 +133,8 @@ int main()
 			// 	input_event &event = input_events[j];
 			// 	printf("%d %d %d\n", event.type, event.code, event.value);
 			// }
-			// TODO write
-			bytes = write(virtual_keyboard.file(), input_events, INPUT_EVENT_COUNT * sizeof(input_event));
-			printf("debug: %zd bytes written\n", bytes); // DEBUG
+			// TODO instead of this, remap and use the 2 events per iteration instead of 3
+			bytes = write(virtual_keyboard_file, input_events, INPUT_EVENT_COUNT * sizeof(input_event));
 		}
 	}
 

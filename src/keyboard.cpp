@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <string.h>
 
 #include <fcntl.h>
@@ -19,7 +20,10 @@ bool Keyboard::close()
 {
 	if (m_file == -1)
 		return true;
-	ungrab();
+	if (m_virtual)
+		ioctl(m_file, UI_DEV_DESTROY);
+	else
+		ungrab();
 	int result = ::close(m_file);
 	m_file = -1;
 	return result == 0;
@@ -42,6 +46,7 @@ bool Keyboard::open_physical(const char *path)
 {
 	close();
 	m_file = ::open(path, O_RDWR | O_NONBLOCK);
+	m_virtual = false;
 	return m_file != -1;
 }
 
@@ -49,25 +54,35 @@ bool Keyboard::open_physical(const char *path)
 bool Keyboard::open_virtual()
 {
 	close();
+
 	m_file = ::open("/dev/uinput", O_WRONLY | O_NONBLOCK);
 	if (m_file == -1)
 		return false;
+	m_virtual = false;
 
-	uinput_setup usetup;
 	if (ioctl(m_file, UI_SET_EVBIT, EV_KEY) == -1)
 		return false;
+	for (uint16_t key = 0; key < KEY_CNT; key++)
+		if (ioctl(m_file, UI_SET_KEYBIT, key) == -1)
+			return false;
 
-	memset(&usetup, 0, sizeof(usetup));
-	usetup.id.bustype = BUS_USB;
-	usetup.id.vendor = 0x1234;
-	usetup.id.product = 0x5678;
-	strcpy(usetup.name, "Key Overlord Virtual Keyboard");
+	constexpr uinput_setup USETUP = uinput_setup {
+		.id = input_id {
+			.bustype = BUS_USB,
+			.vendor = 0x1234,
+			.product = 0x5678,
+			.version = 0,
+		},
+		.name = "Key Overlord Virtual Keyboard",
+		.ff_effects_max = 0,
+	};
 
-	if (ioctl(m_file, UI_DEV_SETUP, &usetup) == -1)
+	if (ioctl(m_file, UI_DEV_SETUP, &USETUP) == -1)
 		return false;
 	if (ioctl(m_file, UI_DEV_CREATE) == -1)
 		return false;
 
+	m_virtual = true;
 	return true;
 }
 

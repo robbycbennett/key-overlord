@@ -39,6 +39,7 @@ public:
 
 private:
 	int m_file = -1;
+	bool m_virtual = false;
 
 	Keyboard(const Keyboard &&) = delete;
 	Keyboard operator=(const Keyboard &&) = delete;
