@@ -21,8 +21,14 @@ enum KeyState {
 };
 
 
-#define FAIL_INNER(message) "keyoverlord: " message "\n"
+#define APP_NAME "keyoverlord"
+#define APP_VERSION "1.0.0"
+
+#define FAIL_INNER(message) APP_NAME ": " message "\n"
 #define FAIL(message) return fwrite(FAIL_INNER(message), 1, sizeof(FAIL_INNER(message)) - 1, stderr), 1;
+
+#define SUCCEED_INNER(message) message "\n"
+#define SUCCEED(message) return fwrite(SUCCEED_INNER(message), 1, sizeof(SUCCEED_INNER(message)) - 1, stdout), 1;
 
 #define PHYSICAL_DEVICE_DIRECTORY "/dev/input/by-path/"
 
@@ -98,8 +104,16 @@ static bool is_physical_device(const char *string, size_t length)
 }
 
 
-int main()
+int main(int argc, char **argv)
 {
+	// Parse arguments
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+			SUCCEED(APP_NAME ": keyboard remapper")
+		if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
+			SUCCEED(APP_NAME " " APP_VERSION)
+	}
+
 	// Fail if not root
 	if (getuid() != 0)
 		FAIL("Run as root to acquire keyboards")
