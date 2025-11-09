@@ -37,19 +37,48 @@ static void handle_input_event(VirtualKeyboard &keyboard, const input_event &eve
 	if (event.value < KeyStateRelease || event.value > KeyStateRepeat)
 		return;
 
-	switch (event.value) {
-		case KeyStateRelease:
-			printf("Released %s\n", get_key_name(event.code));
-			break;
-		case KeyStatePress:
-			printf(" Pressed %s\n", get_key_name(event.code));
-			break;
-		case KeyStateRepeat:
-			printf("Repeated %s\n", get_key_name(event.code));
-			break;
-		default:
-			break;
-	}
+	// // DEBUG
+	// switch (event.value) {
+	// 	case KeyStateRelease:
+	// 		printf("Released %s\n", get_key_name(event.code));
+	// 		break;
+	// 	case KeyStatePress:
+	// 		printf(" Pressed %s\n", get_key_name(event.code));
+	// 		break;
+	// 	case KeyStateRepeat:
+	// 		printf("Repeated %s\n", get_key_name(event.code));
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
+
+	constexpr size_t OUTPUT_EVENT_COUNT = 2;
+	static input_event output_events[OUTPUT_EVENT_COUNT] = {
+		{
+			.time = timeval {
+				.tv_sec = 0,
+				.tv_usec = 0,
+			},
+			.type = EV_KEY,
+			.code = 0,
+			.value = 0,
+		},
+		{
+			.time = timeval {
+				.tv_sec = 0,
+				.tv_usec = 0,
+			},
+			.type = EV_SYN,
+			.code = SYN_REPORT,
+			.value = 0,
+		},
+	};
+	constexpr input_event &output_event = output_events[0];
+
+	output_event.code = event.code;
+	output_event.value = event.value;
+	keyboard.write(*output_events, OUTPUT_EVENT_COUNT);
+	// TODO remap
 }
 
 
@@ -167,17 +196,8 @@ int main()
 			const size_t input_event_count = static_cast<size_t>(bytes) / sizeof(input_event);
 			for (size_t j = 0; j < input_event_count; j++)
 				handle_input_event(virtual_keyboard, input_events[j]);
-
-			// for (uint8_t j = 0; j < INPUT_EVENT_COUNT; j++) {
-			// 	input_event &event = input_events[j];
-			// 	printf("%d %d %d\n", event.type, event.code, event.value);
-			// }
-			// TODO instead of this, remap and use the 2 events per iteration instead of 3
-			virtual_keyboard.write(*input_events, INPUT_EVENT_COUNT);
 		}
 	}
 
-	// TODO cleanup epoll_file
-	// TODO cleanup epoll_events
-	// epoll_ctl(epoll_file, EPOLL_CTL_DEL, file, &mEpollFileInfos[i]) == 0;
+	::close(epoll_file);
 }
