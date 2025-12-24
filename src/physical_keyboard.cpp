@@ -49,9 +49,12 @@ bool PhysicalKeyboard::open(const char *path)
 }
 
 
-bool PhysicalKeyboard::read(input_event &event)
+int8_t PhysicalKeyboard::read(input_event (&event)[INPUT_EVENT_COUNT])
 {
-	return ::read(m_file, &event, sizeof(input_event)) != -1;
+	ssize_t bytes = ::read(m_file, &event, sizeof(input_event) * INPUT_EVENT_COUNT);
+	if (bytes < 0)
+		return -1;
+	return static_cast<int8_t>(static_cast<size_t>(bytes) / sizeof(input_event));
 }
 
 

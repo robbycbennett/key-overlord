@@ -9,6 +9,7 @@
 #include "config.hpp"
 #include "dir.hpp"
 #include "key_name.hpp"
+#include "keyboard_state.hpp"
 #include "physical_keyboard.hpp"
 #include "virtual_keyboard.hpp"
 
@@ -36,27 +37,39 @@ enum KeyState {
 static bool running = true;
 
 
-static void handle_input_event(VirtualKeyboard &keyboard, const input_event &event)
+static void handle_input_event(const input_event &event, KeyboardState &state, VirtualKeyboard &keyboard)
 {
 	if (event.type != EV_KEY)
 		return;
-	if (event.value < KeyStateRelease || event.value > KeyStateRepeat)
-		return;
 
-	// // DEBUG
-	// switch (event.value) {
-	// 	case KeyStateRelease:
-	// 		printf("Released %s\n", get_key_name(event.code));
-	// 		break;
-	// 	case KeyStatePress:
-	// 		printf(" Pressed %s\n", get_key_name(event.code));
-	// 		break;
-	// 	case KeyStateRepeat:
-	// 		printf("Repeated %s\n", get_key_name(event.code));
-	// 		break;
-	// 	default:
-	// 		break;
-	// }
+	// DEBUG
+	switch (event.value) {
+		case KeyStateRelease:
+			fprintf(stderr, "Released %s\n", get_key_name(event.code));
+			break;
+		case KeyStatePress:
+			fprintf(stderr, " Pressed %s\n", get_key_name(event.code));
+			break;
+		case KeyStateRepeat:
+			fprintf(stderr, "Repeated %s\n", get_key_name(event.code));
+			break;
+		default:
+			break;
+	}
+
+	// Remember the state
+	switch (event.value) {
+		case KeyStateRelease:
+			state.clear(event.code);
+			break;
+		case KeyStatePress:
+			state.set(event.code);
+			break;
+		case KeyStateRepeat:
+			break;
+		default:
+			return;
+	}
 
 	constexpr size_t OUTPUT_EVENT_COUNT = 2;
 	static input_event output_events[OUTPUT_EVENT_COUNT] = {
@@ -149,6 +162,7 @@ int main(int argc, char **argv)
 
 	// Acquire physical keyboards and listen to them
 	PhysicalKeyboard physical_keyboards[MAX_KEYBOARDS];
+	KeyboardState keyboard_states[MAX_KEYBOARDS];
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
 		if (not dir)
@@ -187,7 +201,6 @@ int main(int argc, char **argv)
 
 	// TODO watch for keyboard plug/unplug events
 
-	static constexpr uint8_t INPUT_EVENT_COUNT = 3;
 	input_event input_events[INPUT_EVENT_COUNT];
 
 	// Wait for the next general event
@@ -201,17 +214,30 @@ int main(int argc, char **argv)
 			epoll_event &general_event = epoll_events[i];
 			int file = general_event.data.fd;
 
+			// Get physical keyboard and state
+			PhysicalKeyboard *physical = nullptr;
+			KeyboardState *state = nullptr;
+			for (size_t j = 0; j < MAX_KEYBOARDS; j++) {
+				PhysicalKeyboard &current = physical_keyboards[j];
+				if (current.file() == file) {
+					physical = &current;
+					state = &keyboard_states[j];
+					break;
+				}
+			}
+			if (not physical)
+				continue;
+
 			// Get input events
-			ssize_t bytes = read(file, input_events, INPUT_EVENT_COUNT * sizeof(input_event));
-			if (bytes < 0)
+			int8_t input_event_count = physical->read(input_events);
+			if (input_event_count < 0)
 				continue;
 
 			// Each input event
-			const size_t input_event_count = static_cast<size_t>(bytes) / sizeof(input_event);
-			for (size_t j = 0; j < input_event_count; j++)
-				handle_input_event(virtual_keyboard, input_events[j]);
+			for (size_t j = 0; j < static_cast<size_t>(input_event_count); j++)
+				handle_input_event(input_events[j], *state, virtual_keyboard);
 		}
 	}
 
-	::close(epoll_file);
+	close(epoll_file);
 }

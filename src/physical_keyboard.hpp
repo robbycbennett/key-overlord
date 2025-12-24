@@ -2,6 +2,10 @@
 
 
 #include <stddef.h>
+#include <stdint.h>
+
+
+static constexpr size_t INPUT_EVENT_COUNT = 3;
 
 
 // An actual keyboard
@@ -23,8 +27,9 @@ public:
 	// Open and grab the file for exclusive read/write access, closing the old file
 	bool open(const char *path);
 
-	// Get the next event, defined in <linux/input.h>
-	bool read(struct input_event &event);
+	// Get up to 3 events which are defined in <linux/input.h>
+	// returning the number of events or -1 on failure
+	int8_t read(struct input_event (&event)[INPUT_EVENT_COUNT]);
 
 	// Input some key events, defined in <linux/input.h>
 	bool write(const struct input_event &events, size_t event_count);
