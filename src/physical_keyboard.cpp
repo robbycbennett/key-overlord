@@ -1,7 +1,10 @@
 #include <fcntl.h>
+#include <linux/input-event-codes.h>
 #include <linux/uinput.h>
 #include <unistd.h>
 
+#include "key_state.hpp"
+#include "output_events.hpp"
 #include "physical_keyboard.hpp"
 
 
@@ -39,6 +42,13 @@ bool PhysicalKeyboard::open(const char *path)
 	m_file = ::open(path, O_RDWR | O_NONBLOCK);
 	if (m_file == -1)
 		return false;
+
+	// Release the enter key
+	// TODO clear all pressed keys
+	input_event *output_event = output_events + 2;
+	output_event->code = KEY_ENTER;
+	output_event->value = KeyStateRelease;
+	write(*output_events, 2);
 
 	if (ioctl(m_file, EVIOCGRAB, 1) == -1) {
 		close();

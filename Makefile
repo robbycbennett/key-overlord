@@ -11,7 +11,7 @@ OBJECT_TYPE := .o
 STANDARD := -std=c++20
 OPTIMIZE := -O1
 
-IGNORED := -Wno-c++98-compat-pedantic -Wno-unsafe-buffer-usage
+IGNORED := -Wno-c++20-extensions -Wno-c++98-compat-pedantic -Wno-unsafe-buffer-usage
 
 ifeq ($(COMPILER), clang++)
 	WARNINGS := -Weverything $(IGNORED)
@@ -24,8 +24,8 @@ LINK_FLAGS := -fuse-ld=lld
 
 DEBUG := 1
 ifneq ($(DEBUG), 0)
+	DEBUG_COMMAND := gdb -ex=r -ex=bt --batch --args
 	LINK_FLAGS := $(LINK_FLAGS) -g
-	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
 endif
 
 SOURCE_FOLDER := src
@@ -82,7 +82,7 @@ run: $(PROGRAM)
 # 	@$(ECHO_NEW_LINE)
 # 	@$(PROGRAM)
 	rsync $(PROGRAM) root@laptop:
-	ssh root@laptop -t ./$(PROGRAM_NAME)
+	ssh root@laptop -t $(DEBUG_COMMAND) ./$(PROGRAM_NAME)
 
 kill:
 	ssh root@laptop pkill -9 -f $(PROGRAM_NAME)

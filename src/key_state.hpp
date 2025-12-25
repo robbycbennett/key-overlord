@@ -1,11 +1,9 @@
 #pragma once
 
 
-#include <stdint.h>
-
-
-enum class KeyState: uint8_t {
-	Release,
-	Press,
-	Repeat,
+// The same as Wayland wl_keyboard_key_state
+enum KeyState {
+	KeyStateRelease,
+	KeyStatePress,
+	KeyStateRepeat,
 };

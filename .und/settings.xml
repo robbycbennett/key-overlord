@@ -54,7 +54,7 @@
     create_references_to_local_objects="true"
     create_references_to_macros_during_macro_expansion="false"
     create_references_to_parameters="true"
-    cxx_std="gnu++17"
+    cxx_std="c++23"
     cuda_arch="sm_20"
     delayed_template_parsing="false"
     disable_system_includes="false"

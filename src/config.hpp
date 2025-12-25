@@ -10,7 +10,7 @@ constexpr uint8_t MAX_KEYBOARDS = 2;
 constexpr uint8_t MAX_KEYBOARDS_FOR_REMAPPER = 2;
 
 // End of file name of devices that are keyboards
-#define PHYSICAL_DEVICE_NAME_END "0-event-kbd"
+constexpr char PHYSICAL_DEVICE_NAME_END[] = "0-event-kbd";
 
 
 // Constraints
