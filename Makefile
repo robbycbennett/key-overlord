@@ -22,9 +22,10 @@ endif
 COMPILE_FLAGS := $(STANDARD) $(OPTIMIZE) $(WARNINGS)
 LINK_FLAGS := -fuse-ld=lld
 
-DEBUG := 1
+DEBUG := 0
 ifneq ($(DEBUG), 0)
 	DEBUG_COMMAND := gdb -ex=r -ex=bt --batch --args
+	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
 	LINK_FLAGS := $(LINK_FLAGS) -g
 endif
 

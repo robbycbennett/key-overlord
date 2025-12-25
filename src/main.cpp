@@ -290,7 +290,7 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 	if (event.type != EV_KEY or event.code >= KEY_COUNT)
 		return;
 
-	// DEBUG
+#ifdef DEBUG
 	switch (event.value) {
 		case KeyStateRelease:
 			fprintf(stderr, "\nInput:  Released %s\n", get_key_name(event.code));
@@ -304,6 +304,7 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 		default:
 			break;
 	}
+#endif
 
 	// Remember the state
 	switch (event.value) {
@@ -332,7 +333,9 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 		// If it's the same mapping, repeat the mapping and stop
 		if (previous_mapping and *previous_mapping == mapping->to) {
 			for (uint16_t key : mapping->to) {
-				fprintf(stderr, "Output: Repeat previous map %s\n", get_key_name(key)); // DEBUG
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Repeat previous map %s\n", get_key_name(key));
+			#endif
 				output_event->code = key;
 				output_event->value = KeyStateRepeat;
 				output_event += 2;
@@ -345,7 +348,9 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 		// Release the previous mapping
 		if (previous_mapping) {
 			for (uint16_t key : *previous_mapping) {
-				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key)); // DEBUG
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
+			#endif
 				output_event->code = key;
 				output_event->value = KeyStateRelease;
 				output_event += 2;
@@ -356,7 +361,9 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 		else {
 			// Current key
 			if (event.value == KeyStateRelease) {
-				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(event.code)); // DEBUG
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(event.code));
+			#endif
 				output_event->code = event.code;
 				output_event->value = KeyStateRelease;
 				output_event += 2;
@@ -364,9 +371,11 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 			}
 			// Other keys
 			for (uint16_t key = 0; key < KEY_COUNT; key++) {
-				if (not state.get(key))
+				if (not state.get(key) or key == event.code)
 					continue;
-				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(key)); // DEBUG
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(key));
+			#endif
 				output_event->code = key;
 				output_event->value = KeyStateRelease;
 				output_event += 2;
@@ -379,7 +388,9 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 
 		// Press the "to" keys of the remap
 		for (uint16_t key : mapping->to) {
-			fprintf(stderr, "Output: Press map %s\n", get_key_name(key)); // DEBUG
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Press map %s\n", get_key_name(key));
+		#endif
 			output_event->code = key;
 			output_event->value = KeyStatePress;
 			output_event += 2;
@@ -394,17 +405,22 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 	if (previous_mapping) {
 		// Release the previous mapping
 		for (uint16_t key : *previous_mapping) {
-			fprintf(stderr, "Output: Release map %s\n", get_key_name(key)); // DEBUG
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Release map %s\n", get_key_name(key));
+		#endif
 			output_event->code = key;
 			output_event->value = KeyStateRelease;
 			output_event += 2;
 			output_event_count += 2;
 		}
-		// Press the physically pressed other than the new one
-		for (uint16_t key = 0; key < KEY_COUNT; key++) {
+		// Press the physically pressed other than the new one, in reverse order
+		// to press the modifier keys first
+		for (uint16_t key = KEY_COUNT - 1; key-- > 0;) {
 			if (not state.get(key) or key == event.code)
 				continue;
-			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key)); // DEBUG
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
+		#endif
 			output_event->code = key;
 			output_event->value = KeyStatePress;
 			output_event += 2;
@@ -414,8 +430,9 @@ static void handle_input_event(const input_event &event, KeyboardState &state, c
 	previous_mapping = nullptr;
 
 	// Press/release/repeat the same key
-	// TODO find why this is causing a bug
-	fprintf(stderr, "Output: Same key %s\n", get_key_name(event.code)); // DEBUG
+#ifdef DEBUG
+	fprintf(stderr, "Output: Same key %s\n", get_key_name(event.code));
+#endif
 	output_event->code = event.code;
 	output_event->value = event.value;
 	output_event_count += 2;
