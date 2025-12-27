@@ -18,8 +18,9 @@ public:
 
 	constexpr KeyboardState(KeySpan keys)
 	{
-		for (size_t i = 0; i < keys.size; i++)
-			set(keys.data[i]);
+		const uint16_t *key_end = keys.data + keys.size;
+		for (const uint16_t *key = keys.data; key < key_end; key++)
+			set(*key);
 	}
 
 	constexpr void clear(uint16_t key)

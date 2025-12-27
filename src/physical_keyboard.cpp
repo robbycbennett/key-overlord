@@ -44,11 +44,13 @@ bool PhysicalKeyboard::open(const char *path)
 		return false;
 
 	// Release the enter key
-	// TODO clear all pressed keys
+	// TODO clear all pressed keys, not just enter
 	input_event *output_event = output_events + 2;
 	output_event->code = KEY_ENTER;
 	output_event->value = KeyStateRelease;
 	write(*output_events, 2);
+	// TODO eliminate the sleep by waiting until the device node is available (libevdev fetch_syspath_and_devnode)
+	sleep(1);
 
 	if (ioctl(m_file, EVIOCGRAB, 1) == -1) {
 		close();

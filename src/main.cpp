@@ -1,12 +1,14 @@
-#include <span>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 
 #include <linux/input-event-codes.h>
+#include <linux/limits.h>
 #include <linux/uinput.h>
 #include <sys/epoll.h>
+#include <sys/inotify.h>
 
 #include "config.hpp"
 #include "dir.hpp"
@@ -30,8 +32,6 @@
 		KeySpan {array##_INPUT, sizeof(array##_INPUT) / sizeof(uint16_t)}, \
 		KeySpan {array##_OUTPUT, sizeof(array##_OUTPUT) / sizeof(uint16_t)} \
 	)
-
-#define PHYSICAL_DEVICE_DIRECTORY "/dev/input/by-path/"
 
 #define SUCCEED_INNER(message) message "\n"
 #define SUCCEED(message) return fwrite(SUCCEED_INNER(message), 1, sizeof(SUCCEED_INNER(message)) - 1, stdout), 1;
@@ -458,6 +458,8 @@ static bool is_physical_device(const char *string, size_t length)
 
 int main(int argc, char **argv)
 {
+	constexpr const char PHYSICAL_DEVICE_DIRECTORY[] = "/dev/input/by-path";
+
 	// Parse arguments
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0)
@@ -482,22 +484,44 @@ int main(int argc, char **argv)
 	if (not virtual_keyboard.open())
 		FAIL("Failed to create a virtual keyboard")
 
+	// Create a queue to listen to filesystem events
+	int inotify_file = inotify_init();
+	if (inotify_file == -1)
+		FAIL("Failed to create a queue to watch the filesystem")
+
+	// Listen to changes of the directory
+	constexpr uint32_t DIRECTORY_EVENT_KINDS = IN_MOVED_TO | IN_DELETE;
+	if (inotify_add_watch(inotify_file, PHYSICAL_DEVICE_DIRECTORY, DIRECTORY_EVENT_KINDS) == -1)
+		FAIL("Failed to create watch the directory /dev/input/by-path")
+
 	// Prepare to listen to keyboard events
 	int epoll_file = epoll_create1(0);
 	if (epoll_file == -1)
 		FAIL("Failed to create an event poll file")
 
-	// Configure what keyboard events to listen to
-	epoll_event epoll_events[MAX_KEYBOARDS] = {
+	// Configure what events to listen to
+	constexpr uint8_t MAX_EPOLL_EVENTS = MAX_KEYBOARDS + 1;
+	static_assert(MAX_EPOLL_EVENTS > 0);
+	static_assert(MAX_EPOLL_EVENTS > MAX_KEYBOARDS);
+	epoll_event epoll_events[MAX_EPOLL_EVENTS] = {
 		epoll_event {
 			.events = EPOLLIN,
-			.data = epoll_data { .ptr = nullptr },
+			.data = epoll_data { .fd = -1 },
 		},
 		epoll_event {
 			.events = EPOLLIN,
-			.data = epoll_data { .ptr = nullptr },
+			.data = epoll_data { .fd = -1 },
+		},
+		epoll_event {
+			.events = EPOLLIN,
+			.data = epoll_data { .fd = inotify_file },
 		},
 	};
+
+	// Listen to the filesystem change queue
+	epoll_event *epoll_event_inotify = epoll_events + MAX_KEYBOARDS;
+	if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, inotify_file, epoll_event_inotify) == -1)
+		FAIL("Failed to watch the filesystem change queue")
 
 	// Acquire physical keyboards and listen to them
 	PhysicalKeyboard physical_keyboards[MAX_KEYBOARDS];
@@ -505,9 +529,11 @@ int main(int argc, char **argv)
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
 		if (not dir)
-			FAIL("Failed to open " PHYSICAL_DEVICE_DIRECTORY)
+			FAIL("Failed to open the directory /dev/input/by-path")
 
-		char path[256] = PHYSICAL_DEVICE_DIRECTORY;
+		constexpr size_t PATH_PREFIX = 20;
+		char path[256] = "/dev/input/by-path/";
+		static_assert(PATH_PREFIX < sizeof(path));
 
 		// Each file
 		uint8_t i = 0;
@@ -518,14 +544,14 @@ int main(int argc, char **argv)
 				continue;
 
 			// Get the path to the keyboard
-			if (sizeof(PHYSICAL_DEVICE_DIRECTORY) + name_length > sizeof(path))
+			if (PATH_PREFIX + name_length + 1 > sizeof(path))
 				FAIL("Path of physical keyboard device is too large")
-			memcpy(path + sizeof(PHYSICAL_DEVICE_DIRECTORY) - 1, name, name_length);
+			memcpy(path + PATH_PREFIX - 1, name, name_length + 1);
 
-			// Acquire and grab the keyboard
+			// Acquire and grab the keyboard or skip
 			PhysicalKeyboard &physical = physical_keyboards[i];
 			if (not physical.open(path))
-				FAIL("Failed to open a physical keyboard device")
+				continue;
 			// Watch the keyboard and remember the file descriptor
 			epoll_events[i].data.fd = physical.file();
 			if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, physical.file(), epoll_events + i) == -1)
@@ -536,10 +562,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// TODO wait until the device node is available (libevdev fetch_syspath_and_devnode) and release all keys before grab
-
-	// TODO watch for keyboard plug/unplug events
-
 	input_event input_events[INPUT_EVENT_COUNT];
 
 	const KeySpan *previous_mapping = nullptr;
@@ -547,22 +569,53 @@ int main(int argc, char **argv)
 	// Wait for the next general event
 	while (running) {
 		int event_count = epoll_wait(epoll_file, epoll_events, MAX_KEYBOARDS, -1);
-		if (event_count < 0)
+		if (event_count <= 0)
 			continue;
 
 		// Each general event
-		for (int i = 0; i < event_count; i++) {
-			epoll_event &general_event = epoll_events[i];
-			int file = general_event.data.fd;
+		epoll_event *event_end = epoll_events + event_count;
+		for (epoll_event *event = epoll_events; event < event_end; event++) {
+			int file = event->data.fd;
+
+			// Handle a plugged/unplugged keyboard
+			if (file == inotify_file) {
+				struct INotifyEvent
+				{
+					int32_t wd;
+					uint32_t mask;
+					uint32_t cookie;
+					uint32_t len;
+					char name[NAME_MAX + 1];
+				};
+				static_assert(offsetof(INotifyEvent, wd) == offsetof(inotify_event, wd));
+				static_assert(offsetof(INotifyEvent, mask) == offsetof(inotify_event, mask));
+				static_assert(offsetof(INotifyEvent, cookie) == offsetof(inotify_event, cookie));
+				static_assert(offsetof(INotifyEvent, len) == offsetof(inotify_event, len));
+				static_assert(offsetof(INotifyEvent, name) == offsetof(inotify_event, name));
+
+				INotifyEvent dir_event;
+
+				// Read or try again later
+				ssize_t bytes_read = read(inotify_file, &dir_event, sizeof(dir_event));
+				if (bytes_read <= 0)
+					continue;
+
+				// TODO
+				// // Acquire or release keyboard
+				// if (dir_event.mask & IN_MOVED_TO)
+				// 	acquire_keyboard(dir_event.name);
+				// else if (dir_event.mask & IN_DELETE)
+				// 	remove_keyboard(dir_event.name);
+			}
 
 			// Get physical keyboard and state
 			PhysicalKeyboard *physical = nullptr;
 			KeyboardState *state = nullptr;
-			for (size_t j = 0; j < MAX_KEYBOARDS; j++) {
-				PhysicalKeyboard &current = physical_keyboards[j];
+			for (size_t i = 0; i < MAX_KEYBOARDS; i++) {
+				PhysicalKeyboard &current = physical_keyboards[i];
 				if (current.file() == file) {
 					physical = &current;
-					state = &keyboard_states[j];
+					state = &keyboard_states[i];
 					break;
 				}
 			}
@@ -575,8 +628,9 @@ int main(int argc, char **argv)
 				continue;
 
 			// Each input event
-			for (size_t j = 0; j < static_cast<size_t>(input_event_count); j++)
-				handle_input_event(input_events[j], *state, previous_mapping, virtual_keyboard);
+			input_event *end = input_events + input_event_count;
+			for (input_event *i = input_events; i < end; i++)
+				handle_input_event(*i, *state, previous_mapping, virtual_keyboard);
 		}
 	}
 

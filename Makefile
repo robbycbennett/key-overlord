@@ -77,11 +77,10 @@ help:
 	@echo     Compile the program and run it
 	@$(ECHO_NEW_LINE)
 
+copy: $(PROGRAM)
+	rsync $(PROGRAM) root@laptop:
+
 run: $(PROGRAM)
-# 	@$(ECHO_NEW_LINE)
-# 	@echo $(PROGRAM)
-# 	@$(ECHO_NEW_LINE)
-# 	@$(PROGRAM)
 	rsync $(PROGRAM) root@laptop:
 	ssh root@laptop -t $(DEBUG_COMMAND) ./$(PROGRAM_NAME)
 
