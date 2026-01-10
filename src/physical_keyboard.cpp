@@ -45,7 +45,7 @@ bool PhysicalKeyboard::open(const char *path)
 
 	// Release the enter key
 	// TODO clear all pressed keys, not just enter
-	input_event *output_event = output_events + 2;
+	input_event *output_event = output_events;
 	output_event->code = KEY_ENTER;
 	output_event->value = KeyStateRelease;
 	write(*output_events, 2);
