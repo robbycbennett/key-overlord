@@ -58,6 +58,7 @@
     cuda_arch="sm_20"
     delayed_template_parsing="false"
     disable_system_includes="false"
+    disable_cxx_std_lib_includes="false"
     triple=""
     ignore_dir_in_include_files="false"
     ignore_preprocessor_conditionals="false"

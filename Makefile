@@ -22,11 +22,15 @@ endif
 COMPILE_FLAGS := $(STANDARD) $(OPTIMIZE) $(WARNINGS)
 LINK_FLAGS := -fuse-ld=lld
 
-DEBUG := 0
-ifneq ($(DEBUG), 0)
+DEBUGGER := 0
+ifneq ($(DEBUGGER), 0)
 	DEBUG_COMMAND := gdb -ex=r -ex=bt --batch --args
-	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
 	LINK_FLAGS := $(LINK_FLAGS) -g
+endif
+
+DEBUG_PRINTING := 1
+ifneq ($(DEBUG_PRINTING), 0)
+	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
 endif
 
 SOURCE_FOLDER := src
@@ -78,11 +82,11 @@ help:
 	@$(ECHO_NEW_LINE)
 
 copy: $(PROGRAM)
-	rsync $(PROGRAM) root@laptop:
+	rsync $(PROGRAM) root@laptop:/usr/bin/
 
 run: $(PROGRAM)
-	rsync $(PROGRAM) root@laptop:
-	ssh root@laptop -t $(DEBUG_COMMAND) ./$(PROGRAM_NAME)
+	rsync $(PROGRAM) root@laptop:/usr/bin/
+	ssh root@laptop -t $(DEBUG_COMMAND) /usr/bin/$(PROGRAM_NAME)
 
 kill:
 	ssh root@laptop pkill -9 -f $(PROGRAM_NAME)
