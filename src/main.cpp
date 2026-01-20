@@ -25,15 +25,6 @@
 #define APP_NAME "keyoverlord"
 #define APP_VERSION "1.0.0"
 
-#define FAIL_INNER(message) APP_NAME ": " message "\n"
-#define FAIL(message) return fwrite(FAIL_INNER(message), 1, sizeof(FAIL_INNER(message)) - 1, stderr), 1;
-
-#define SUCCEED_INNER(message) message "\n"
-#define SUCCEED(message) return fwrite(SUCCEED_INNER(message), 1, sizeof(SUCCEED_INNER(message)) - 1, stdout), 1;
-
-#define WARN_INNER(message) APP_NAME ": " message "\n"
-#define WARN(message) fwrite(WARN_INNER(message), 1, sizeof(WARN_INNER(message)) - 1, stderr);
-
 
 static bool running = true;
 
@@ -263,15 +254,21 @@ int main(int argc, char **argv)
 
 	// Parse arguments
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0)
-			SUCCEED(APP_NAME ": keyboard remapper")
-		if (strcmp(argv[i], "-v") == 0 or strcmp(argv[i], "--version") == 0)
-			SUCCEED(APP_NAME " " APP_VERSION)
+		if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0) {
+			fputs(APP_NAME ": keyboard remapper\n", stdout);
+			return 0;
+		}
+		if (strcmp(argv[i], "-v") == 0 or strcmp(argv[i], "--version") == 0) {
+			fputs(APP_NAME " " APP_VERSION "\n", stdout);
+			return 0;
+		}
 	}
 
 	// Fail if not root
-	if (getuid() != 0)
-		FAIL("Run as root to acquire keyboards")
+	if (getuid() != 0) {
+		fputs(APP_NAME ": Run as root to acquire keyboards\n", stderr);
+		return 1;
+	}
 
 	// Handle signals gracefully
 	signal(SIGHUP,  handle_signal);
@@ -282,23 +279,31 @@ int main(int argc, char **argv)
 
 	// Acquire the virtual keyboard
 	VirtualKeyboard virtual_keyboard;
-	if (not virtual_keyboard.open())
-		FAIL("Failed to create a virtual keyboard")
+	if (not virtual_keyboard.open()) {
+		fputs(APP_NAME ": Failed to create a virtual keyboard\n", stderr);
+		return 1;
+	}
 
 	// Create a queue to listen to filesystem events
 	int inotify_file = inotify_init();
-	if (inotify_file == -1)
-		FAIL("Failed to create a queue to watch the filesystem")
+	if (inotify_file == -1) {
+		fputs(APP_NAME ": Failed to create a queue to watch the filesystem\n", stderr);
+		return 1;
+	}
 
 	// Listen to changes of the directory
 	constexpr uint32_t DIRECTORY_EVENT_KINDS = IN_MOVED_TO | IN_DELETE;
-	if (inotify_add_watch(inotify_file, PHYSICAL_DEVICE_DIRECTORY, DIRECTORY_EVENT_KINDS) == -1)
-		FAIL("Failed to create watch the directory /dev/input/by-path")
+	if (inotify_add_watch(inotify_file, PHYSICAL_DEVICE_DIRECTORY, DIRECTORY_EVENT_KINDS) == -1) {
+		fputs(APP_NAME ": Failed to create watch the directory /dev/input/by-path\n", stderr);
+		return 1;
+	}
 
 	// Prepare to listen to keyboard events
 	int epoll_file = epoll_create1(0);
-	if (epoll_file == -1)
-		FAIL("Failed to create an event poll file")
+	if (epoll_file == -1) {
+		fputs(APP_NAME ": Failed to create an event poll file\n", stderr);
+		return 1;
+	}
 
 	// Configure what events to listen to
 	constexpr uint8_t MAX_EPOLL_EVENTS = MAX_KEYBOARDS + 1;
@@ -321,8 +326,10 @@ int main(int argc, char **argv)
 
 	// Listen to the filesystem change queue
 	epoll_event *epoll_event_inotify = epoll_events + MAX_KEYBOARDS;
-	if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, inotify_file, epoll_event_inotify) == -1)
-		FAIL("Failed to watch the filesystem change queue")
+	if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, inotify_file, epoll_event_inotify) == -1) {
+		fputs(APP_NAME ": Failed to watch the filesystem change queue\n", stderr);
+		return 1;
+	}
 
 	// Acquire physical keyboards and listen to them
 	PhysicalKeyboard physical_keyboards[MAX_KEYBOARDS];
@@ -330,8 +337,10 @@ int main(int argc, char **argv)
 	Name keyboard_names[MAX_KEYBOARDS];
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
-		if (not dir)
-			FAIL("Failed to open the directory /dev/input/by-path")
+		if (not dir) {
+			fputs(APP_NAME ": Failed to open the directory /dev/input/by-path\n", stderr);
+			return 1;
+		}
 
 		// Each file
 		PhysicalKeyboard *keyboard = physical_keyboards;
@@ -356,10 +365,10 @@ int main(int argc, char **argv)
 						goto acquire_loop_end;
 					continue;
 				case PathTooLarge:
-					WARN("Path of physical keyboard device is too large")
+					fputs("Path of physical keyboard device is too large\n", stderr);
 					continue;
 				case UnableToWatchKeyboard:
-					WARN("Failed to watch a physical keyboard device")
+					fputs("Failed to watch a physical keyboard device\n", stderr);
 					continue;
 				case NotAPhysicalDevice:
 				case UnableToOpenKeyboard:
@@ -436,10 +445,10 @@ acquire_loop_end:
 							saved_name->set(name, name_length);
 							continue;
 						case PathTooLarge:
-							WARN("Path of physical keyboard device is too large")
+							fputs("Path of physical keyboard device is too large\n", stderr);
 							continue;
 						case UnableToWatchKeyboard:
-							WARN("Failed to watch a physical keyboard device")
+							fputs("Failed to watch a physical keyboard device\n", stderr);
 							continue;
 						case NotAPhysicalDevice:
 						case UnableToOpenKeyboard:
@@ -478,7 +487,7 @@ acquire_loop_end:
 
 					// Stop watching the keyboard and forget its file descriptor
 					if (epoll_ctl(epoll_file, EPOLL_CTL_DEL, keyboard->file(), event) == -1)
-						WARN("Failed to stop watching the keyboard")
+						fputs("Failed to stop watching the keyboard\n", stderr);
 					event->data.fd = -1;
 
 					// Close the keyboard file
