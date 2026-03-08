@@ -9,7 +9,6 @@
 static constexpr uint16_t KEY_COUNT = 768;
 
 
-// TODO consider a dual stack data structure instead (fixed on stack, unlimited on heap), which keeps track of the order of the pressed keys, eliminating hundreds of nearly pointless keys from iteration
 // A bit for each of the 768 keys
 class KeyboardState
 {
@@ -27,33 +26,39 @@ public:
 	{
 		if (key > KEY_COUNT)
 			return;
-		m_data[key / 8] &= ~(1 << (key % 8));
+		m_data[key / BITS_PER_GROUP] &= ~(static_cast<uint64_t>(1) << (key % BITS_PER_GROUP));
 	}
 
 	constexpr bool get(uint16_t key)
 	{
 		if (key > KEY_COUNT)
 			return false;
-		return m_data[key / 8] & (1 << (key % 8));
+		return m_data[key / BITS_PER_GROUP] & (static_cast<uint64_t>(1) << (key % BITS_PER_GROUP));
 	}
 
 	constexpr void set(uint16_t key)
 	{
 		if (key > KEY_COUNT)
 			return;
-		m_data[key / 8] |= 1 << (key % 8);
+		m_data[key / BITS_PER_GROUP] |= static_cast<uint64_t>(1) << (key % BITS_PER_GROUP);
 	}
 
 	constexpr bool operator==(const KeyboardState &other) const
 	{
-		for (uint8_t i = 0; i < KEY_GROUP_COUNT; i++)
-			if (m_data[i] != other.m_data[i])
+		const uint64_t *self_i = m_data;
+		const uint64_t *other_i = other.m_data;
+		const uint64_t *self_end = m_data + KEY_GROUP_COUNT;
+		for (; self_i != self_end; self_i++, other_i++)
+			if (*self_i != *other_i)
 				return false;
 		return true;
 	}
 
 private:
-	static constexpr uint8_t KEY_GROUP_COUNT = KEY_COUNT / 8;
+	static constexpr uint64_t BITS_PER_GROUP = 64;
+	static constexpr uint64_t KEY_GROUP_COUNT = KEY_COUNT / BITS_PER_GROUP;
 
-	uint8_t m_data[KEY_GROUP_COUNT] = {0};
+	uint64_t m_data[KEY_GROUP_COUNT] = {0};
+
+	static_assert(BITS_PER_GROUP == 8 * sizeof(m_data[0]));
 };

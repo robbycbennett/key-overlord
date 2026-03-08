@@ -18,6 +18,7 @@ Dir::~Dir()
 
 const char *Dir::read()
 {
+	// TODO add read_many to speed this up
 	if (not m_dir)
 		return nullptr;
 	dirent *file = readdir(static_cast<DIR *>(m_dir));

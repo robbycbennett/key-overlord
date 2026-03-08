@@ -20,12 +20,16 @@ else
 endif
 
 COMPILE_FLAGS := $(STANDARD) $(OPTIMIZE) $(WARNINGS)
-LINK_FLAGS := -fuse-ld=lld
+LINK_FLAGS := -fuse-ld=lld -static
 
 DEBUGGER := 0
+PROFILER := 0
 ifneq ($(DEBUGGER), 0)
-	DEBUG_COMMAND := gdb -ex=r -ex=bt --batch --args
 	LINK_FLAGS := $(LINK_FLAGS) -g
+	PRE_RUN_COMMAND := gdb -ex=r -ex=bt --batch --args
+else ifneq ($(PROFILER), 0)
+	LINK_FLAGS := $(LINK_FLAGS) -g
+	PRE_RUN_COMMAND := perf record -g -q --user-callchains --
 endif
 
 DEBUG_PRINTING := 0
@@ -86,7 +90,7 @@ copy: $(PROGRAM)
 
 run: $(PROGRAM)
 	rsync $(PROGRAM) root@laptop:/usr/bin/
-	ssh root@laptop -t $(DEBUG_COMMAND) /usr/bin/$(PROGRAM_NAME)
+	ssh root@laptop -t $(PRE_RUN_COMMAND) /usr/bin/$(PROGRAM_NAME)
 
 kill:
 	ssh root@laptop pkill -9 -f $(PROGRAM_NAME)

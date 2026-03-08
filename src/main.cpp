@@ -26,167 +26,6 @@
 #define APP_VERSION "1.0.0"
 
 
-static bool running = true;
-
-
-static bool is_physical_device(const char &string, size_t length);
-
-
-static void handle_input_event(const input_event &event, KeyboardState &state, const KeySpan *&previous_mapping, VirtualKeyboard &keyboard)
-{
-	if (event.type != EV_KEY or event.code >= KEY_COUNT)
-		return;
-
-#ifdef DEBUG
-	switch (event.value) {
-		case KeyStateRelease:
-			fprintf(stderr, "\nInput:  Released %s\n", get_key_name(event.code));
-			break;
-		case KeyStatePress:
-			fprintf(stderr, "\nInput:  Pressed %s\n", get_key_name(event.code));
-			break;
-		case KeyStateRepeat:
-			fprintf(stderr, "\nInput:  Repeated %s\n", get_key_name(event.code));
-			break;
-		default:
-			break;
-	}
-#endif
-
-	// Remember the state
-	switch (event.value) {
-		case KeyStateRelease:
-			state.clear(event.code);
-			break;
-		case KeyStatePress:
-			state.set(event.code);
-			break;
-		case KeyStateRepeat:
-			break;
-		default:
-			return;
-	}
-
-	input_event *output_event = output_events;
-	size_t output_event_count = 0;
-
-	// Remap
-	constexpr const Mapping *MAPPING_END = MAPPINGS + sizeof(MAPPINGS) / sizeof(Mapping);
-	for (const Mapping *mapping = MAPPINGS; mapping < MAPPING_END; mapping++) {
-		// Skip if the mapping isn't needed
-		if (mapping->from != state)
-			continue;
-
-		// If it's the same mapping, repeat the mapping and stop
-		if (previous_mapping and *previous_mapping == mapping->to) {
-			for (uint16_t key : mapping->to) {
-			#ifdef DEBUG
-				fprintf(stderr, "Output: Repeat previous map %s\n", get_key_name(key));
-			#endif
-				output_event->code = key;
-				output_event->value = KeyStateRepeat;
-				output_event += 2;
-				output_event_count += 2;
-			}
-			keyboard.write(*output_events, output_event_count);
-			return;
-		}
-
-		// Release the previous mapping
-		if (previous_mapping) {
-			for (uint16_t key : *previous_mapping) {
-			#ifdef DEBUG
-				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
-			#endif
-				output_event->code = key;
-				output_event->value = KeyStateRelease;
-				output_event += 2;
-				output_event_count += 2;
-			}
-		}
-		// Release the physically pressed keys
-		else {
-			// Current key
-			if (event.value == KeyStateRelease) {
-			#ifdef DEBUG
-				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(event.code));
-			#endif
-				output_event->code = event.code;
-				output_event->value = KeyStateRelease;
-				output_event += 2;
-				output_event_count += 2;
-			}
-			// Other keys
-			for (uint16_t key = 0; key < KEY_COUNT; key++) {
-				if (not state.get(key) or key == event.code)
-					continue;
-			#ifdef DEBUG
-				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(key));
-			#endif
-				output_event->code = key;
-				output_event->value = KeyStateRelease;
-				output_event += 2;
-				output_event_count += 2;
-			}
-		}
-
-		// Remember this mapping
-		previous_mapping = &mapping->to;
-
-		// Press the "to" keys of the remap
-		for (uint16_t key : mapping->to) {
-		#ifdef DEBUG
-			fprintf(stderr, "Output: Press map %s\n", get_key_name(key));
-		#endif
-			output_event->code = key;
-			output_event->value = KeyStatePress;
-			output_event += 2;
-			output_event_count += 2;
-		}
-
-		// Stop after all of the changes
-		keyboard.write(*output_events, output_event_count);
-		return;
-	}
-
-	if (previous_mapping) {
-		// Release the previous mapping
-		for (uint16_t key : *previous_mapping) {
-		#ifdef DEBUG
-			fprintf(stderr, "Output: Release map %s\n", get_key_name(key));
-		#endif
-			output_event->code = key;
-			output_event->value = KeyStateRelease;
-			output_event += 2;
-			output_event_count += 2;
-		}
-		// Press the physically pressed other than the new one, in reverse order
-		// to press the modifier keys first
-		for (uint16_t key = KEY_COUNT - 1; key-- > 0;) {
-			if (not state.get(key) or key == event.code)
-				continue;
-		#ifdef DEBUG
-			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
-		#endif
-			output_event->code = key;
-			output_event->value = KeyStatePress;
-			output_event += 2;
-			output_event_count += 2;
-		}
-	}
-	previous_mapping = nullptr;
-
-	// Press/release/repeat the same key
-#ifdef DEBUG
-	fprintf(stderr, "Output: Same key %s\n", get_key_name(event.code));
-#endif
-	output_event->code = event.code;
-	output_event->value = event.value;
-	output_event_count += 2;
-	keyboard.write(*output_events, output_event_count);
-}
-
-
 enum class AcquireKeyboardResult: uint8_t
 {
 	Ok,
@@ -197,55 +36,29 @@ enum class AcquireKeyboardResult: uint8_t
 };
 
 
+static bool running = true;
+
+
 // Open a keyboard for reading and writing and listen to it
-static AcquireKeyboardResult acquire_keyboard(const char &name, size_t name_length, PhysicalKeyboard &keyboard, int epoll_file, epoll_event &event)
-{
-	using enum AcquireKeyboardResult;
+static AcquireKeyboardResult acquire_keyboard(
+	const char &name,
+	size_t name_length,
+	PhysicalKeyboard &keyboard,
+	int epoll_file,
+	epoll_event &event);
 
-	// File path of keyboard
-	char path[256] = "/dev/input/by-path/";
-	constexpr size_t PATH_PREFIX = 20;
-	static_assert(PATH_PREFIX < sizeof(path));
+// Remember the keyboard state and write to the virtual keyboard
+static void handle_input_event(
+	const input_event &event,
+	KeyboardState &state,
+	const KeySpan *&previous_mapping,
+	VirtualKeyboard &keyboard);
 
-	// Skip everything but physical keyboards
-	if (not is_physical_device(name, name_length))
-		return NotAPhysicalDevice;
-
-	// Get the path to the keyboard
-	if (PATH_PREFIX + name_length + 1 > sizeof(path))
-		return PathTooLarge;
-	memcpy(path + PATH_PREFIX - 1, &name, name_length + 1);
-
-	// Open for reading and writing
-	if (not keyboard.open(path))
-		return UnableToOpenKeyboard;
-
-	// Watch the keyboard and remember the file descriptor
-	event.data.fd = keyboard.file();
-	if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, keyboard.file(), &event) == -1) {
-		event.data.fd = -1;
-		keyboard.close();
-		return UnableToWatchKeyboard;
-	}
-
-	return Ok;
-}
-
-
-static void handle_signal(int)
-{
-	running = false;
-}
-
+// Set the global variable `running` to false
+static void handle_signal(int signal_number);
 
 // Whether the string ends in "0-event-kbd"
-static bool is_physical_device(const char &string, size_t length)
-{
-	constexpr size_t SUBSTR_LENGTH = sizeof(PHYSICAL_DEVICE_NAME_END) - 1;
-	if (length < SUBSTR_LENGTH)
-		return false;
-	return memcmp(&string + length - SUBSTR_LENGTH, PHYSICAL_DEVICE_NAME_END, SUBSTR_LENGTH) == 0;
-}
+static bool is_physical_device(const char &string, size_t length);
 
 
 int main(int argc, char **argv)
@@ -524,4 +337,217 @@ acquire_loop_end:
 	}
 
 	close(epoll_file);
+}
+
+
+static AcquireKeyboardResult acquire_keyboard(
+	const char &name,
+	size_t name_length,
+	PhysicalKeyboard &keyboard,
+	int epoll_file,
+	epoll_event &event)
+{
+	using enum AcquireKeyboardResult;
+
+	// File path of keyboard
+	char path[256] = "/dev/input/by-path/";
+	constexpr size_t PATH_PREFIX = 20;
+	static_assert(PATH_PREFIX < sizeof(path));
+
+	// Skip everything but physical keyboards
+	if (not is_physical_device(name, name_length))
+		return NotAPhysicalDevice;
+
+	// Get the path to the keyboard
+	if (PATH_PREFIX + name_length + 1 > sizeof(path))
+		return PathTooLarge;
+	memcpy(path + PATH_PREFIX - 1, &name, name_length + 1);
+
+	// Open for reading and writing
+	if (not keyboard.open(path))
+		return UnableToOpenKeyboard;
+
+	// Watch the keyboard and remember the file descriptor
+	event.data.fd = keyboard.file();
+	if (epoll_ctl(epoll_file, EPOLL_CTL_ADD, keyboard.file(), &event) == -1) {
+		event.data.fd = -1;
+		keyboard.close();
+		return UnableToWatchKeyboard;
+	}
+
+	return Ok;
+}
+
+
+static void handle_input_event(
+	const input_event &event,
+	KeyboardState &state,
+	const KeySpan *&previous_mapping,
+	VirtualKeyboard &keyboard)
+{
+	if (event.type != EV_KEY or event.code >= KEY_COUNT)
+		return;
+
+#ifdef DEBUG
+	switch (event.value) {
+		case KeyStateRelease:
+			fprintf(stderr, "\nInput:  Released %s\n", get_key_name(event.code));
+			break;
+		case KeyStatePress:
+			fprintf(stderr, "\nInput:  Pressed %s\n", get_key_name(event.code));
+			break;
+		case KeyStateRepeat:
+			fprintf(stderr, "\nInput:  Repeated %s\n", get_key_name(event.code));
+			break;
+		default:
+			break;
+	}
+#endif
+
+	// Remember the state
+	switch (event.value) {
+		case KeyStateRelease:
+			state.clear(event.code);
+			break;
+		case KeyStatePress:
+			state.set(event.code);
+			break;
+		case KeyStateRepeat:
+			break;
+		default:
+			return;
+	}
+
+	input_event *output_event = output_events;
+	size_t output_event_count = 0;
+
+	// Remap
+	constexpr const Mapping *MAPPING_END = MAPPINGS + sizeof(MAPPINGS) / sizeof(Mapping);
+	for (const Mapping *mapping = MAPPINGS; mapping < MAPPING_END; mapping++) {
+		// Skip if the mapping isn't needed
+		if (mapping->from != state)
+			continue;
+
+		// If it's the same mapping, repeat the mapping and stop
+		if (previous_mapping and *previous_mapping == mapping->to) {
+			for (uint16_t key : mapping->to) {
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Repeat previous map %s\n", get_key_name(key));
+			#endif
+				output_event->code = key;
+				output_event->value = KeyStateRepeat;
+				output_event += 2;
+				output_event_count += 2;
+			}
+			keyboard.write(*output_events, output_event_count);
+			return;
+		}
+
+		// Release the previous mapping
+		if (previous_mapping) {
+			for (uint16_t key : *previous_mapping) {
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
+			#endif
+				output_event->code = key;
+				output_event->value = KeyStateRelease;
+				output_event += 2;
+				output_event_count += 2;
+			}
+		}
+		// Release the physically pressed keys
+		else {
+			// Current key
+			if (event.value == KeyStateRelease) {
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(event.code));
+			#endif
+				output_event->code = event.code;
+				output_event->value = KeyStateRelease;
+				output_event += 2;
+				output_event_count += 2;
+			}
+			// Other keys
+			for (uint16_t key = 0; key < KEY_COUNT; key++) {
+				if (not state.get(key) or key == event.code)
+					continue;
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(key));
+			#endif
+				output_event->code = key;
+				output_event->value = KeyStateRelease;
+				output_event += 2;
+				output_event_count += 2;
+			}
+		}
+
+		// Remember this mapping
+		previous_mapping = &mapping->to;
+
+		// Press the "to" keys of the remap
+		for (uint16_t key : mapping->to) {
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Press map %s\n", get_key_name(key));
+		#endif
+			output_event->code = key;
+			output_event->value = KeyStatePress;
+			output_event += 2;
+			output_event_count += 2;
+		}
+
+		// Stop after all of the changes
+		keyboard.write(*output_events, output_event_count);
+		return;
+	}
+
+	if (previous_mapping) {
+		// Release the previous mapping
+		for (uint16_t key : *previous_mapping) {
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Release map %s\n", get_key_name(key));
+		#endif
+			output_event->code = key;
+			output_event->value = KeyStateRelease;
+			output_event += 2;
+			output_event_count += 2;
+		}
+		// Press the physically pressed other than the new one, in reverse order
+		// to press the modifier keys first
+		for (uint16_t key = KEY_COUNT - 1; key-- > 0;) {
+			if (not state.get(key) or key == event.code)
+				continue;
+		#ifdef DEBUG
+			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
+		#endif
+			output_event->code = key;
+			output_event->value = KeyStatePress;
+			output_event += 2;
+			output_event_count += 2;
+		}
+	}
+	previous_mapping = nullptr;
+
+	// Press/release/repeat the same key
+#ifdef DEBUG
+	fprintf(stderr, "Output: Same key %s\n", get_key_name(event.code));
+#endif
+	output_event->code = event.code;
+	output_event->value = event.value;
+	output_event_count += 2;
+	keyboard.write(*output_events, output_event_count);
+}
+
+
+static void handle_signal(int)
+{
+	running = false;
+}
+
+
+static bool is_physical_device(const char &string, size_t length)
+{
+	constexpr size_t SUBSTR_LENGTH = sizeof(PHYSICAL_DEVICE_NAME_END) - 1;
+	if (length < SUBSTR_LENGTH)
+		return false;
+	return memcmp(&string + length - SUBSTR_LENGTH, PHYSICAL_DEVICE_NAME_END, SUBSTR_LENGTH) == 0;
 }
