@@ -12,6 +12,7 @@
 
 #include "config.hpp"
 #include "dir.hpp"
+#include "dir_iterator.hpp"
 #include "key_name.hpp"
 #include "key_state.hpp"
 #include "keyboard_state.hpp"
@@ -160,7 +161,10 @@ int main(int argc, char **argv)
 		PhysicalKeyboard *end = physical_keyboards + MAX_KEYBOARDS;
 		epoll_event *event = epoll_events;
 		Name *saved_name = keyboard_names;
-		for (const char *name = dir.read(); name and running; name = dir.read()) {
+
+		uint8_t dir_entry_buffer[1024];
+		DirIterator dir_iterator(dir, *dir_entry_buffer, sizeof(dir_entry_buffer));
+		for (const char *name = dir_iterator.next_name(); name; name = dir_iterator.next_name()) {
 			size_t name_length = strlen(name);
 			if (name_length > NAME_MAX)
 				continue;

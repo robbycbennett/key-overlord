@@ -20,5 +20,5 @@ public:
 
 private:
 	size_t m_size = 0;
-	char m_name[NAME_MAX];
+	char m_name[NAME_MAX + 1];
 };

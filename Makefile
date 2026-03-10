@@ -11,7 +11,7 @@ OBJECT_TYPE := .o
 STANDARD := -std=c++20
 OPTIMIZE := -O1
 
-IGNORED := -Wno-c++20-extensions -Wno-c++23-extensions -Wno-c++98-compat-pedantic -Wno-covered-switch-default -Wno-padded -Wno-unsafe-buffer-usage
+IGNORED := -Wno-c++20-extensions -Wno-c++23-extensions -Wno-c++98-compat-pedantic -Wno-c99-extensions -Wno-covered-switch-default -Wno-padded -Wno-unsafe-buffer-usage
 
 ifeq ($(COMPILER), clang++)
 	WARNINGS := -Weverything $(IGNORED)

@@ -1,6 +1,11 @@
 #pragma once
 
 
+#include <stdint.h>
+
+#include <sys/types.h>
+
+
 // Directory
 class Dir
 {
@@ -10,14 +15,14 @@ public:
 	// Close
 	~Dir();
 
-	// Get the next file name or null at end
-	// * Invalidated on next call of read
-	// * Invalidated on directory close
-	const char *read();
+	// Read many directory entries (linux_dirent64 from https://man7.org/linux/man-pages/man2/getdents64.2.html)
+	//
+	// Returns the number of bytes or -1 for an error and errno is set
+	ssize_t read(uint8_t &buffer, size_t buffer_size);
 
 	// Whether it opened
 	operator bool() const;
 
 private:
-	void *m_dir;
+	int m_file;
 };

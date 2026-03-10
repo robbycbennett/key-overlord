@@ -1,32 +1,31 @@
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "dir.hpp"
 
 
 Dir::Dir(const char *path)
 {
-	m_dir = path ? opendir(path) : nullptr;
+	m_file = path ? open(path, O_RDONLY | O_DIRECTORY) : -1;
 }
 
 
 Dir::~Dir()
 {
-	if (m_dir)
-		closedir(static_cast<DIR *>(m_dir));
+	if (m_file != -1) {
+		close(m_file);
+	}
 }
 
 
-const char *Dir::read()
+ssize_t Dir::read(uint8_t &buffer, size_t buffer_size)
 {
-	// TODO add read_many to speed this up
-	if (not m_dir)
-		return nullptr;
-	dirent *file = readdir(static_cast<DIR *>(m_dir));
-	return file ? file->d_name : nullptr;
+	return getdents64(m_file, &buffer, buffer_size);
 }
 
 
 Dir::operator bool() const
 {
-	return m_dir;
+	return m_file;
 }
