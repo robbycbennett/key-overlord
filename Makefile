@@ -1,89 +1,53 @@
 # Variables
 
-PROGRAM_NAME := keyoverlord
+PROGRAM_NAME = keyoverlord
 
-COMPILER := clang++
+CXX = clang++
+CXXFLAGS = -O2 -Wall -fno-exceptions -std=c++20
 
-SOURCE_TYPE := .cpp
-HEADER_TYPE := .hpp
-OBJECT_TYPE := .o
+LD = clang++
+LDFLAGS = -fuse-ld=lld -s -static
 
-STANDARD := -std=c++20
-OPTIMIZE := -O1
-
-IGNORED := -Wno-c++20-extensions -Wno-c++23-extensions -Wno-c++98-compat-pedantic -Wno-c99-extensions -Wno-covered-switch-default -Wno-padded -Wno-unsafe-buffer-usage
-
-ifeq ($(COMPILER), clang++)
-	WARNINGS := -Weverything $(IGNORED)
-else
-	WARNINGS := -Wall $(IGNORED)
+DEBUG = 0
+ifneq ($(DEBUG), 0)
+	CXXFLAGS += -DDEBUG
+	LDFLAGS += -g
 endif
 
-COMPILE_FLAGS := $(STANDARD) $(OPTIMIZE) $(WARNINGS)
-LINK_FLAGS := -fuse-ld=lld -static
-
-DEBUGGER := 0
-PROFILER := 0
-ifneq ($(DEBUGGER), 0)
-	LINK_FLAGS := $(LINK_FLAGS) -g
-	PRE_RUN_COMMAND := gdb -ex=r -ex=bt --batch --args
-else ifneq ($(PROFILER), 0)
-	LINK_FLAGS := $(LINK_FLAGS) -g
-	PRE_RUN_COMMAND := perf record -g -q --user-callchains --
+RUN_DEBUGGER = 0
+RUN_PROFILER = 0
+ifneq ($(RUN_DEBUGGER), 0)
+	ifeq ($(DEBUG), 0)
+		LDFLAGS += -g
+	endif
+	PRE_RUN_COMMAND = gdb -ex=r -ex=bt --batch --args
+else ifneq ($(RUN_PROFILER), 0)
+	LDFLAGS += -g
+	PRE_RUN_COMMAND = perf record -g -q --user-callchains --
 endif
 
-DEBUG_PRINTING := 0
-ifneq ($(DEBUG_PRINTING), 0)
-	COMPILE_FLAGS := $(COMPILE_FLAGS) -DDEBUG
-endif
-
-SOURCE_FOLDER := src
-OUTPUT_FOLDER := out
-
-CLEAN_FOLDERS := $(OUTPUT_FOLDER)
-
-ECHO_NEW_LINE := echo
-CLEAN_COMMAND := rm -rf $(CLEAN_FOLDERS)
-
-SOURCES := $(wildcard $(SOURCE_FOLDER)/*$(SOURCE_TYPE))
-HEADERS := $(wildcard $(SOURCE_FOLDER)/*$(HEADER_TYPE))
-OBJECTS := $(patsubst $(SOURCE_FOLDER)/%$(SOURCE_TYPE),$(OUTPUT_FOLDER)/%$(OBJECT_TYPE),$(SOURCES))
-PROGRAM := $(OUTPUT_FOLDER)/$(PROGRAM_NAME)
+SOURCES = $(wildcard src/*.cpp)
+HEADERS = $(wildcard src/*.hpp)
+OBJECTS = $(patsubst src/%.cpp,out/%.o,$(SOURCES))
+PROGRAM = out/$(PROGRAM_NAME)
 
 
 # Targets
 
+$(PROGRAM): $(OBJECTS) | out
+	$(LD) -o $(PROGRAM) $(OBJECTS) $(LDFLAGS)
 
-$(PROGRAM): $(OBJECTS) | $(OUTPUT_FOLDER)
-	$(COMPILER) -o $(PROGRAM) $(OBJECTS) $(LINK_FLAGS)
+out/%.o: src/%.cpp $(HEADERS) Makefile | out
+	$(CXX) -o $@ -c $< $(CXXFLAGS)
 
-$(OUTPUT_FOLDER)/%$(OBJECT_TYPE): $(SOURCE_FOLDER)/%$(SOURCE_TYPE) $(HEADERS) Makefile | $(OUTPUT_FOLDER)
-	$(COMPILER) -o $@ -c $< $(COMPILE_FLAGS)
-
-$(OUTPUT_FOLDER):
-	mkdir -p $(OUTPUT_FOLDER)
+out:
+	mkdir -p out
 
 
 # Commands
 
-
 clean:
-	$(CLEAN_COMMAND)
-
-help:
-	@$(ECHO_NEW_LINE)
-	@echo make
-	@echo     Compile the program
-	@$(ECHO_NEW_LINE)
-	@echo make clean
-	@echo     Remove the obj and bin folders
-	@$(ECHO_NEW_LINE)
-	@echo make help
-	@echo     Get help with the Makefile
-	@$(ECHO_NEW_LINE)
-	@echo make run
-	@echo     Compile the program and run it
-	@$(ECHO_NEW_LINE)
+	rm -rf out
 
 copy: $(PROGRAM)
 	rsync $(PROGRAM) root@laptop:/usr/bin/
@@ -93,4 +57,4 @@ run: $(PROGRAM)
 	ssh root@laptop -t $(PRE_RUN_COMMAND) /usr/bin/$(PROGRAM_NAME)
 
 kill:
-	ssh root@laptop pkill -9 -f $(PROGRAM_NAME)
+	ssh root@laptop pkill -9 -f /usr/bin/$(PROGRAM_NAME)

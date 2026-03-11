@@ -64,6 +64,7 @@ static bool is_physical_device(const char &string, size_t length);
 
 int main(int argc, char **argv)
 {
+	// TODO fix bugs with starting/stopping with the remapped keyboard, possibly related to stdin, stdout, stderr
 	constexpr const char PHYSICAL_DEVICE_DIRECTORY[] = "/dev/input/by-path";
 
 	// Parse arguments
