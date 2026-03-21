@@ -52,7 +52,7 @@ static AcquireKeyboardResult acquire_keyboard(
 static void handle_input_event(
 	const input_event &event,
 	KeyboardState &state,
-	const KeySpan *&previous_mapping,
+	const KeySpan *&previous_mapping_ptr,
 	VirtualKeyboard &keyboard);
 
 // Set the global variable `running` to false
@@ -199,7 +199,7 @@ acquire_loop_end:
 
 	input_event input_events[INPUT_EVENT_COUNT];
 
-	const KeySpan *previous_mapping = nullptr;
+	const KeySpan *previous_mapping_ptr = nullptr;
 
 	// Wait for the next general event
 	while (running) {
@@ -337,7 +337,7 @@ acquire_loop_end:
 			// Each input event
 			input_event *end = input_events + input_event_count;
 			for (input_event *i = input_events; i < end; i++)
-				handle_input_event(*i, *state, previous_mapping, virtual_keyboard);
+				handle_input_event(*i, *state, previous_mapping_ptr, virtual_keyboard);
 		}
 	}
 
@@ -387,7 +387,7 @@ static AcquireKeyboardResult acquire_keyboard(
 static void handle_input_event(
 	const input_event &event,
 	KeyboardState &state,
-	const KeySpan *&previous_mapping,
+	const KeySpan *&previous_mapping_ptr,
 	VirtualKeyboard &keyboard)
 {
 	if (event.type != EV_KEY or event.code >= KEY_COUNT)
@@ -433,9 +433,17 @@ static void handle_input_event(
 		if (mapping->from != state)
 			continue;
 
-		// If it's the same mapping, repeat the mapping and stop
-		if (previous_mapping and *previous_mapping == mapping->to) {
-			for (uint16_t key : mapping->to) {
+		KeySpan mapping_to = mapping->to;
+
+		if (previous_mapping_ptr) {
+			KeySpan previous_mapping = *previous_mapping_ptr;
+
+			// If it's the same mapping, repeat the last key and stop
+			if (previous_mapping == mapping_to) {
+				if (mapping_to.is_empty()) {
+					return;
+				}
+				uint16_t key = mapping_to.last();
 			#ifdef DEBUG
 				fprintf(stderr, "Output: Repeat previous map %s\n", get_key_name(key));
 			#endif
@@ -443,14 +451,15 @@ static void handle_input_event(
 				output_event->value = KeyStateRepeat;
 				output_event += 2;
 				output_event_count += 2;
+				keyboard.write(*output_events, output_event_count);
+				return;
 			}
-			keyboard.write(*output_events, output_event_count);
-			return;
-		}
 
-		// Release the previous mapping
-		if (previous_mapping) {
-			for (uint16_t key : *previous_mapping) {
+			// Release the previous mapping
+			const uint16_t *i = previous_mapping.reverse_begin();
+			const uint16_t *reverse_end = previous_mapping.reverse_end();
+			for (; i != reverse_end; i--) {
+				uint16_t key = *i;
 			#ifdef DEBUG
 				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
 			#endif
@@ -487,10 +496,10 @@ static void handle_input_event(
 		}
 
 		// Remember this mapping
-		previous_mapping = &mapping->to;
+		previous_mapping_ptr = &mapping->to;
 
 		// Press the "to" keys of the remap
-		for (uint16_t key : mapping->to) {
+		for (uint16_t key : mapping_to) {
 		#ifdef DEBUG
 			fprintf(stderr, "Output: Press map %s\n", get_key_name(key));
 		#endif
@@ -505,17 +514,23 @@ static void handle_input_event(
 		return;
 	}
 
-	if (previous_mapping) {
+	if (previous_mapping_ptr) {
+		KeySpan previous_mapping = *previous_mapping_ptr;
 		// Release the previous mapping
-		for (uint16_t key : *previous_mapping) {
+		const uint16_t *i = previous_mapping.reverse_begin();
+		const uint16_t *reverse_end = previous_mapping.reverse_end();
+		for (; i != reverse_end; i--) {
+			uint16_t key = *i;
 		#ifdef DEBUG
-			fprintf(stderr, "Output: Release map %s\n", get_key_name(key));
+			fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
 		#endif
 			output_event->code = key;
 			output_event->value = KeyStateRelease;
 			output_event += 2;
 			output_event_count += 2;
 		}
+
+		// TODO fix timing bug with resuming
 		// Press the physically pressed other than the new one, in reverse order
 		// to press the modifier keys first
 		for (uint16_t key = KEY_COUNT - 1; key-- > 0;) {
@@ -530,7 +545,7 @@ static void handle_input_event(
 			output_event_count += 2;
 		}
 	}
-	previous_mapping = nullptr;
+	previous_mapping_ptr = nullptr;
 
 	// Press/release/repeat the same key
 #ifdef DEBUG

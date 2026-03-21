@@ -21,6 +21,26 @@ struct KeySpan
 		return data + size;
 	}
 
+	constexpr bool is_empty() const
+	{
+		return size == 0;
+	}
+
+	constexpr uint16_t last() const
+	{
+		return data[size - 1];
+	}
+
+	constexpr const uint16_t *reverse_begin() const
+	{
+		return data + size - 1;
+	}
+
+	constexpr const uint16_t *reverse_end() const
+	{
+		return data - 1;
+	}
+
 	constexpr bool operator==(KeySpan other) const
 	{
 		return data == other.data and size == other.size;
