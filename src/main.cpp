@@ -533,17 +533,19 @@ static void handle_input_event(
 		}
 
 		// Press the physically pressed other than the new one
-		for (uint16_t key : stack) {
-			if (key == event.code) {
-				continue;
+		if (event.value == KeyStatePress) {
+			for (uint16_t key : stack) {
+				if (key == event.code) {
+					continue;
+				}
+			#ifdef DEBUG
+				fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
+			#endif
+				output_event->code = key;
+				output_event->value = KeyStatePress;
+				output_event += 2;
+				output_event_count += 2;
 			}
-		#ifdef DEBUG
-			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
-		#endif
-			output_event->code = key;
-			output_event->value = KeyStatePress;
-			output_event += 2;
-			output_event_count += 2;
 		}
 
 		previous_mapping_ptr = nullptr;
