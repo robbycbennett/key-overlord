@@ -83,11 +83,20 @@
     use_clang="true"
     use_include_cache="true"
     objc_memory_mode="MrrMode"
-    worker_process_timeout="2"/>
+    worker_process_timeout="2">
+    <macros>
+      <macro
+        name="DEBUG"/>
+    </macros>
+  </cpp_options>
   <dependency_options
     exclude_standard="true"
     use_includes="true"
     mode="link"/>
+  <mcp_options
+    enabled="false"
+    allow_reparse="always"
+    allow_ui_interaction="always"/>
   <imports/>
   <metrics
     declared_in_file_display_mode="no_path"

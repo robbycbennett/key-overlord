@@ -4,8 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reverse_range.hpp"
 
-// A view of an statically-allocated array of keys
+
+// A read-only view of an statically-allocated array of keys
 struct KeySpan
 {
 	const uint16_t *data;
@@ -31,14 +33,9 @@ struct KeySpan
 		return data[size - 1];
 	}
 
-	constexpr const uint16_t *reverse_begin() const
+	constexpr ReverseRange<uint16_t> reverse_range() const
 	{
-		return data + size - 1;
-	}
-
-	constexpr const uint16_t *reverse_end() const
-	{
-		return data - 1;
+		return ReverseRange<uint16_t>(data + size - 1, data - 1);
 	}
 
 	constexpr bool operator==(KeySpan other) const

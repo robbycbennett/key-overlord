@@ -14,6 +14,7 @@
 #include "dir.hpp"
 #include "dir_iterator.hpp"
 #include "key_name.hpp"
+#include "key_stack.hpp"
 #include "key_state.hpp"
 #include "keyboard_state.hpp"
 #include "mapping.hpp"
@@ -52,6 +53,7 @@ static AcquireKeyboardResult acquire_keyboard(
 static void handle_input_event(
 	const input_event &event,
 	KeyboardState &state,
+	KeyStack &stack,
 	const KeySpan *&previous_mapping_ptr,
 	VirtualKeyboard &keyboard);
 
@@ -149,6 +151,7 @@ int main(int argc, char **argv)
 	// Acquire physical keyboards and listen to them
 	PhysicalKeyboard physical_keyboards[MAX_KEYBOARDS];
 	KeyboardState keyboard_states[MAX_KEYBOARDS];
+	KeyStack key_stacks[MAX_KEYBOARDS];
 	Name keyboard_names[MAX_KEYBOARDS];
 	{
 		Dir dir(PHYSICAL_DEVICE_DIRECTORY);
@@ -318,11 +321,13 @@ acquire_loop_end:
 			// Get physical keyboard and state
 			PhysicalKeyboard *physical = nullptr;
 			KeyboardState *state = nullptr;
+			KeyStack *stack = nullptr;
 			for (size_t i = 0; i < MAX_KEYBOARDS; i++) {
 				PhysicalKeyboard &current = physical_keyboards[i];
 				if (current.file() == file) {
 					physical = &current;
 					state = &keyboard_states[i];
+					stack = &key_stacks[i];
 					break;
 				}
 			}
@@ -337,7 +342,7 @@ acquire_loop_end:
 			// Each input event
 			input_event *end = input_events + input_event_count;
 			for (input_event *i = input_events; i < end; i++)
-				handle_input_event(*i, *state, previous_mapping_ptr, virtual_keyboard);
+				handle_input_event(*i, *state, *stack, previous_mapping_ptr, virtual_keyboard);
 		}
 	}
 
@@ -387,6 +392,7 @@ static AcquireKeyboardResult acquire_keyboard(
 static void handle_input_event(
 	const input_event &event,
 	KeyboardState &state,
+	KeyStack &stack,
 	const KeySpan *&previous_mapping_ptr,
 	VirtualKeyboard &keyboard)
 {
@@ -413,9 +419,11 @@ static void handle_input_event(
 	switch (event.value) {
 		case KeyStateRelease:
 			state.clear(event.code);
+			stack.remove(event.code);
 			break;
 		case KeyStatePress:
 			state.set(event.code);
+			stack.push(event.code);
 			break;
 		case KeyStateRepeat:
 			break;
@@ -456,10 +464,7 @@ static void handle_input_event(
 			}
 
 			// Release the previous mapping
-			const uint16_t *i = previous_mapping.reverse_begin();
-			const uint16_t *reverse_end = previous_mapping.reverse_end();
-			for (; i != reverse_end; i--) {
-				uint16_t key = *i;
+			for (uint16_t key : previous_mapping.reverse_range()) {
 			#ifdef DEBUG
 				fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
 			#endif
@@ -482,9 +487,10 @@ static void handle_input_event(
 				output_event_count += 2;
 			}
 			// Other keys
-			for (uint16_t key = 0; key < KEY_COUNT; key++) {
-				if (not state.get(key) or key == event.code)
+			for (uint16_t key : stack.reverse_range()) {
+				if (key == event.code) {
 					continue;
+				}
 			#ifdef DEBUG
 				fprintf(stderr, "Output: Release physically pressed %s\n", get_key_name(key));
 			#endif
@@ -515,12 +521,8 @@ static void handle_input_event(
 	}
 
 	if (previous_mapping_ptr) {
-		KeySpan previous_mapping = *previous_mapping_ptr;
 		// Release the previous mapping
-		const uint16_t *i = previous_mapping.reverse_begin();
-		const uint16_t *reverse_end = previous_mapping.reverse_end();
-		for (; i != reverse_end; i--) {
-			uint16_t key = *i;
+		for (uint16_t key : previous_mapping_ptr->reverse_range()) {
 		#ifdef DEBUG
 			fprintf(stderr, "Output: Release previous map %s\n", get_key_name(key));
 		#endif
@@ -530,12 +532,11 @@ static void handle_input_event(
 			output_event_count += 2;
 		}
 
-		// TODO fix timing bug with resuming
-		// Press the physically pressed other than the new one, in reverse order
-		// to press the modifier keys first
-		for (uint16_t key = KEY_COUNT - 1; key-- > 0;) {
-			if (not state.get(key) or key == event.code)
+		// Press the physically pressed other than the new one
+		for (uint16_t key : stack) {
+			if (key == event.code) {
 				continue;
+			}
 		#ifdef DEBUG
 			fprintf(stderr, "Output: Resume physically pressed %s\n", get_key_name(key));
 		#endif
@@ -544,8 +545,9 @@ static void handle_input_event(
 			output_event += 2;
 			output_event_count += 2;
 		}
+
+		previous_mapping_ptr = nullptr;
 	}
-	previous_mapping_ptr = nullptr;
 
 	// Press/release/repeat the same key
 #ifdef DEBUG
