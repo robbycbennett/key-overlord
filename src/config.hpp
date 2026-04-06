@@ -86,6 +86,14 @@ static constexpr const uint16_t REOPEN_TAB_INPUT[] =
 	{KEY_LEFTALT, KEY_LEFTSHIFT, KEY_N};
 static constexpr const uint16_t REOPEN_TAB_OUTPUT[] =
 	{KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_T};
+static constexpr const uint16_t PREVIOUS_TAB_INPUT[] =
+	{KEY_LEFTALT, KEY_COMMA};
+static constexpr const uint16_t PREVIOUS_TAB_OUTPUT[] =
+	{KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_TAB};
+static constexpr const uint16_t NEXT_TAB_INPUT[] =
+	{KEY_LEFTALT, KEY_COMMA};
+static constexpr const uint16_t NEXT_TAB_OUTPUT[] =
+	{KEY_LEFTCTRL, KEY_TAB};
 
 static constexpr const uint16_t PLAY_PAUSE_SONG_ALT_INPUT[] =
 	{KEY_RIGHTALT, KEY_SPACE};
@@ -232,6 +240,8 @@ static constexpr const Mapping MAPPINGS[] = {
 	MAPPING(OPEN_TAB),
 	MAPPING(CLOSE_TAB),
 	MAPPING(REOPEN_TAB),
+	MAPPING(PREVIOUS_TAB),
+	MAPPING(NEXT_TAB),
 	MAPPING(PLAY_PAUSE_SONG_ALT),
 	MAPPING(PLAY_PAUSE_SONG_CTRL),
 	MAPPING(PREVIOUS_SONG_ALT),

@@ -9,6 +9,7 @@
 #include <linux/uinput.h>
 #include <sys/epoll.h>
 #include <sys/inotify.h>
+#include <unistd.h>
 
 #include "config.hpp"
 #include "dir.hpp"

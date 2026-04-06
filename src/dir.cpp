@@ -21,7 +21,7 @@ Dir::~Dir()
 
 ssize_t Dir::read(uint8_t &buffer, size_t buffer_size)
 {
-	return getdents64(m_file, &buffer, buffer_size);
+	return getdents64(m_file, (struct dirent *) (void *) &buffer, buffer_size);
 }
 
 

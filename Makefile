@@ -3,7 +3,7 @@
 PROGRAM_NAME = keyoverlord
 
 CXX = clang++
-CXXFLAGS = -O2 -Wall -flto -fno-exceptions -fno-ident -std=c++20
+CXXFLAGS = -D_LARGEFILE64_SOURCE=64 -O2 -Wall -flto -fno-exceptions -fno-ident -std=c++20
 
 LD = clang++
 LDFLAGS = -fuse-ld=lld -s -static
