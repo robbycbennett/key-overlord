@@ -52,11 +52,11 @@ clean:
 	rm -rf out
 
 copy: $(PROGRAM)
-	rsync $(PROGRAM) root@laptop:/usr/local/bin/
+	rsync $(PROGRAM) root@laptop:/usr/bin/
 
 run: $(PROGRAM)
-	rsync $(PROGRAM) root@laptop:/usr/local/bin/
-	ssh root@laptop -t $(PRE_RUN_COMMAND) /usr/local/bin/$(PROGRAM_NAME)
+	rsync $(PROGRAM) root@laptop:/usr/bin/
+	ssh root@laptop -t $(PRE_RUN_COMMAND) /usr/bin/$(PROGRAM_NAME)
 
 kill:
-	ssh root@laptop pkill -9 -f /usr/local/bin/$(PROGRAM_NAME)
+	ssh root@laptop pkill -9 -f /usr/bin/$(PROGRAM_NAME)

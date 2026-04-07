@@ -91,7 +91,7 @@ static constexpr const uint16_t PREVIOUS_TAB_INPUT[] =
 static constexpr const uint16_t PREVIOUS_TAB_OUTPUT[] =
 	{KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_TAB};
 static constexpr const uint16_t NEXT_TAB_INPUT[] =
-	{KEY_LEFTALT, KEY_COMMA};
+	{KEY_LEFTALT, KEY_DOT};
 static constexpr const uint16_t NEXT_TAB_OUTPUT[] =
 	{KEY_LEFTCTRL, KEY_TAB};
 
