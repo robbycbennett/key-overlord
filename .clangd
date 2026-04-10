@@ -1,2 +1,2 @@
 CompileFlags:
-	Add: ["-D_LARGEFILE64_SOURCE=64", "-Wall", "-std=c++20"]
+  Add: ["-D_LARGEFILE64_SOURCE=64", "-Wall", "-std=c++20"]
