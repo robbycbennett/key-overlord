@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include <linux/input-event-codes.h>
+
 #include "mapping.hpp"
 
 

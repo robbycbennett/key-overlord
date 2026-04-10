@@ -14,7 +14,6 @@
 #include "config.hpp"
 #include "dir.hpp"
 #include "dir_iterator.hpp"
-#include "key_name.hpp"
 #include "key_stack.hpp"
 #include "key_state.hpp"
 #include "keyboard_state.hpp"
@@ -23,6 +22,10 @@
 #include "output_events.hpp"
 #include "physical_keyboard.hpp"
 #include "virtual_keyboard.hpp"
+
+#ifdef DEBUG
+	#include "key_name.hpp"
+#endif
 
 
 #define APP_NAME "keyoverlord"
@@ -67,7 +70,6 @@ static bool is_physical_device(const char &string, size_t length);
 
 int main(int argc, char **argv)
 {
-	// TODO fix bugs with starting/stopping with the remapped keyboard, possibly related to stdin, stdout, stderr
 	constexpr const char PHYSICAL_DEVICE_DIRECTORY[] = "/dev/input/by-path";
 
 	// Parse arguments
