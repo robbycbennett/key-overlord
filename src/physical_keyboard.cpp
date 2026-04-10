@@ -1,5 +1,4 @@
 #include <fcntl.h>
-#include <linux/input-event-codes.h>
 #include <linux/uinput.h>
 #include <unistd.h>
 
@@ -54,8 +53,6 @@ bool PhysicalKeyboard::open(const char *path)
 		key += 1;
 	}
 	write(*output_events, EVENT_COUNT);
-	// TODO eliminate the sleep by waiting until the device node is available (libevdev fetch_syspath_and_devnode)
-	sleep(1);
 
 	if (ioctl(m_file, EVIOCGRAB, 1) == -1) {
 		close();
