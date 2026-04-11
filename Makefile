@@ -52,4 +52,4 @@ clean:
 	rm -rf out
 
 run: $(PROGRAM)
-	$(PRE_RUN_COMMAND) /usr/bin/$(PROGRAM_NAME)
+	$(PRE_RUN_COMMAND) $(PROGRAM)
