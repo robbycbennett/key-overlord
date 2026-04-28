@@ -1,6 +1,6 @@
 # Variables
 
-PROGRAM_NAME = keyoverlord
+PROGRAM_NAME = key-overlord
 
 CXX ?= c++
 CXXFLAGS += -D_LARGEFILE64_SOURCE=64 -O2 -Wall -flto -fno-exceptions -fno-ident -std=c++20
